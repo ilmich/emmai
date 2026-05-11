@@ -17,6 +17,9 @@ type OpenAIClient struct {
 	client       *openai.Client
 	config       *config.Config
 	conversation *Conversation
+	toolRegistry *ToolRegistry
+	toolExecutor ToolExecutor
+	toolChoice   ToolChoice
 }
 
 // NewOpenAIClient creates a new OpenAI client
@@ -49,6 +52,8 @@ func NewOpenAIClient(cfg *config.Config) (*OpenAIClient, error) {
 		client:       openai.NewClientWithConfig(clientConfig),
 		config:       cfg,
 		conversation: NewConversation(cfg.Model),
+		toolRegistry: NewToolRegistry(),
+		toolChoice:   "auto", // Default to auto tool selection
 	}, nil
 }
 
@@ -64,6 +69,17 @@ func (c *OpenAIClient) SendMessage(ctx context.Context, userMsg string) (<-chan 
 		// Add user message to conversation history
 		c.conversation.AddMessage("user", userMsg)
 
+		// Process with tool calling loop
+		c.processWithTools(ctx, textChan, errChan)
+	}()
+
+	return textChan, errChan
+}
+
+// processWithTools handles the tool calling loop
+func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- string, errChan chan<- error) {
+	maxIterations := 10 // Prevent infinite loops
+	for i := 0; i < maxIterations; i++ {
 		// Build messages for API
 		messages := c.buildAPIMessages()
 
@@ -76,49 +92,143 @@ func (c *OpenAIClient) SendMessage(ctx context.Context, userMsg string) (<-chan 
 			Stream:      true,
 		}
 
+		// Add tools if any are registered
+		if c.toolRegistry.HasTools() {
+			tools := c.toolRegistry.GetAllTools()
+			openaiTools := make([]openai.Tool, len(tools))
+			for i, tool := range tools {
+				openaiTools[i] = openai.Tool{
+					Type: openai.ToolType(tool.Type),
+					Function: &openai.FunctionDefinition{
+						Name:        tool.Function.Name,
+						Description: tool.Function.Description,
+						Parameters:  tool.Function.Parameters,
+						Strict:      tool.Function.Strict,
+					},
+				}
+			}
+			req.Tools = openaiTools
+			
+			// Set tool choice if specified
+			if c.toolChoice != nil {
+				req.ToolChoice = c.toolChoice
+			}
+		}
+
 		stream, err := c.client.CreateChatCompletionStream(ctx, req)
 		if err != nil {
 			errChan <- fmt.Errorf("create completion stream: %w", err)
 			return
 		}
-		defer stream.Close()
 
-	var fullResponse strings.Builder
+		var fullResponse strings.Builder
+		var toolCalls []ToolCall
+		var currentToolCall *ToolCall
+		var toolCallIndex int = -1
 
-	// Stream response chunks
-	for {
-		// Check if context was cancelled (ESC pressed)
-		select {
-		case <-ctx.Done():
-			// Context cancelled - exit cleanly
-			return
-		default:
-			// Continue processing
-		}
+		// Stream response chunks
+		for {
+			// Check if context was cancelled (ESC pressed)
+			select {
+			case <-ctx.Done():
+				stream.Close()
+				return
+			default:
+				// Continue processing
+			}
 
-		response, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			errChan <- fmt.Errorf("receive stream: %w", err)
-			return
-		}
+			response, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				stream.Close()
+				errChan <- fmt.Errorf("receive stream: %w", err)
+				return
+			}
 
-		if len(response.Choices) > 0 {
-			chunk := response.Choices[0].Delta.Content
-			if chunk != "" {
-				fullResponse.WriteString(chunk)
-				textChan <- chunk
+			if len(response.Choices) > 0 {
+				delta := response.Choices[0].Delta
+				
+				// Handle regular content
+				if delta.Content != "" {
+					fullResponse.WriteString(delta.Content)
+					textChan <- delta.Content
+				}
+
+				// Handle tool calls
+				if len(delta.ToolCalls) > 0 {
+					for _, tc := range delta.ToolCalls {
+						// Check if this is a new tool call or continuation
+						if tc.Index != nil && *tc.Index != toolCallIndex {
+							// New tool call
+							if currentToolCall != nil {
+								toolCalls = append(toolCalls, *currentToolCall)
+							}
+							toolCallIndex = *tc.Index
+							currentToolCall = &ToolCall{
+								ID:   tc.ID,
+								Type: string(tc.Type),
+								Function: ToolCallFunction{
+									Name:      tc.Function.Name,
+									Arguments: tc.Function.Arguments,
+								},
+							}
+						} else if currentToolCall != nil {
+							// Continuation of current tool call
+							if tc.Function.Name != "" {
+								currentToolCall.Function.Name += tc.Function.Name
+							}
+							if tc.Function.Arguments != "" {
+								currentToolCall.Function.Arguments += tc.Function.Arguments
+							}
+						}
+					}
+				}
 			}
 		}
+		stream.Close()
+
+		// Add the last tool call if any
+		if currentToolCall != nil {
+			toolCalls = append(toolCalls, *currentToolCall)
+		}
+
+		// Add assistant response to conversation
+		msg := Message{
+			Role:      "assistant",
+			Content:   fullResponse.String(),
+			ToolCalls: toolCalls,
+			Timestamp: c.conversation.Messages[len(c.conversation.Messages)-1].Timestamp,
+		}
+		c.conversation.Messages = append(c.conversation.Messages, msg)
+
+		// If there are tool calls, execute them
+		if len(toolCalls) > 0 && c.toolExecutor != nil {
+			for _, tc := range toolCalls {
+				// Execute the tool
+				result, err := c.toolExecutor.Execute(tc.Function.Name, tc.Function.Arguments)
+				if err != nil {
+					result = fmt.Sprintf("Error executing tool: %v", err)
+				}
+
+				// Add tool response to conversation
+				toolMsg := Message{
+					Role:       "tool",
+					Content:    result,
+					ToolCallID: tc.ID,
+					Name:       tc.Function.Name,
+					Timestamp:  c.conversation.Messages[len(c.conversation.Messages)-1].Timestamp,
+				}
+				c.conversation.Messages = append(c.conversation.Messages, toolMsg)
+			}
+			// Continue the loop to get the next response
+			continue
+		}
+
+		// No tool calls, we're done
+		break
 	}
-
-		// Add assistant response to conversation history
-		c.conversation.AddMessage("assistant", fullResponse.String())
-	}()
-
-	return textChan, errChan
 }
 
 // buildAPIMessages converts conversation history to OpenAI API format
@@ -144,10 +254,34 @@ func (c *OpenAIClient) buildAPIMessages() []openai.ChatCompletionMessage {
 
 	// Add conversation history
 	for _, msg := range c.conversation.Messages {
-		messages = append(messages, openai.ChatCompletionMessage{
+		apiMsg := openai.ChatCompletionMessage{
 			Role:    msg.Role,
 			Content: msg.Content,
-		})
+		}
+
+		// Handle tool calls in assistant messages
+		if len(msg.ToolCalls) > 0 {
+			toolCalls := make([]openai.ToolCall, len(msg.ToolCalls))
+			for i, tc := range msg.ToolCalls {
+				toolCalls[i] = openai.ToolCall{
+					ID:   tc.ID,
+					Type: openai.ToolType(tc.Type),
+					Function: openai.FunctionCall{
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+					},
+				}
+			}
+			apiMsg.ToolCalls = toolCalls
+		}
+
+		// Handle tool response messages
+		if msg.Role == "tool" {
+			apiMsg.ToolCallID = msg.ToolCallID
+			apiMsg.Name = msg.Name
+		}
+
+		messages = append(messages, apiMsg)
 	}
 
 	return messages
@@ -179,4 +313,25 @@ func (c *OpenAIClient) GetTokenCount() int {
 		total += len(c.config.SystemPrompt) / 4
 	}
 	return total
+}
+
+// RegisterTool adds a tool to the client's tool registry
+func (c *OpenAIClient) RegisterTool(tool Tool) {
+	c.toolRegistry.RegisterTool(tool)
+}
+
+// SetToolExecutor sets the tool executor for handling tool calls
+func (c *OpenAIClient) SetToolExecutor(executor ToolExecutor) {
+	c.toolExecutor = executor
+}
+
+// SetToolChoice sets how the model should use tools
+// Can be "none", "auto", "required", or a specific function
+func (c *OpenAIClient) SetToolChoice(choice ToolChoice) {
+	c.toolChoice = choice
+}
+
+// GetToolRegistry returns the tool registry
+func (c *OpenAIClient) GetToolRegistry() *ToolRegistry {
+	return c.toolRegistry
 }

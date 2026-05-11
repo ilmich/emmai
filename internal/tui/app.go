@@ -221,6 +221,7 @@ func (a *App) clearConversation() {
 	a.client.ClearConversation()
 	a.chatView.Clear()
 	a.statusBar.SetTokens(0)
+
 	a.systemMessageBar.SetMessage("Started new conversation")
 }
 
