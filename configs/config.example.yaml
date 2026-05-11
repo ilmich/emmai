@@ -1,0 +1,228 @@
+# ============================================================================
+# EmmAI Configuration File
+# ============================================================================
+# Location: ~/.emmai/config.yaml
+#
+# All settings are optional. Environment variables override config file values.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# API Configuration
+# ----------------------------------------------------------------------------
+
+# Optional: OpenAI API key
+# 
+# REQUIRED for default OpenAI API (https://api.openai.com/v1)
+# OPTIONAL for custom endpoints (LocalAI, Ollama, LM Studio, etc.)
+#
+# Many local/self-hosted APIs don't require authentication.
+# You can leave this empty or set an empty string for such endpoints.
+#
+# Get OpenAI API key: https://platform.openai.com/api-keys
+# 
+# Environment variable (recommended): OPENAI_API_KEY
+#   export OPENAI_API_KEY="sk-..."         # For OpenAI
+#   export OPENAI_API_KEY=""               # For LocalAI (empty is OK)
+#
+# Or set in config file:
+#   api_key: sk-...                        # For OpenAI
+#   api_key: ""                            # For LocalAI (empty is OK)
+#   # (or omit the line entirely)
+#
+# api_key: sk-...
+
+# Optional: Custom OpenAI API base URL
+# Default: https://api.openai.com/v1
+#
+# The application automatically appends /v1 if not present.
+# Examples:
+#   http://localhost:8080          → http://localhost:8080/v1
+#   http://localhost:8080/v1       → http://localhost:8080/v1
+#
+# Supported endpoints:
+#   - LocalAI:    http://localhost:8080
+#   - Ollama:     http://localhost:11434
+#   - LM Studio:  http://localhost:1234
+#   - Azure:      https://your-resource.openai.azure.com
+#
+# Environment variables (in order of precedence):
+#   1. OPENAI_BASE_URL
+#   2. OPENAI_API_BASE (fallback)
+#
+# base_url: http://localhost:8080
+
+# Optional: Skip TLS certificate verification (for self-signed certificates)
+# Default: false
+# 
+# WARNING: Only enable for development/testing with self-signed certificates!
+# This disables SSL/TLS security checks.
+#
+# Use cases:
+#   - Local development with self-signed certificates
+#   - Internal corporate proxies with custom CAs
+#   - Testing environments
+#
+# Environment variable: OPENAI_INSECURE_SKIP_VERIFY=true
+#
+# insecure_skip_verify: false
+
+# ----------------------------------------------------------------------------
+# Model Configuration
+# ----------------------------------------------------------------------------
+
+# Model to use (default: gpt-3.5-turbo)
+#
+# OpenAI models:
+#   - gpt-4              Most capable
+#   - gpt-4-turbo        Faster GPT-4
+#   - gpt-3.5-turbo      Fast and economical
+#
+# LocalAI model examples:
+#   - gpt-3.5-turbo      (LocalAI default)
+#   - llama-2-7b         (Llama 2)
+#   - mistral-7b         (Mistral)
+#   - codellama-13b      (Code-specialized)
+#
+# List available models:
+#   curl http://localhost:8080/v1/models
+#
+model: gpt-3.5-turbo
+
+# ----------------------------------------------------------------------------
+# Generation Parameters
+# ----------------------------------------------------------------------------
+
+# Temperature: Controls randomness (0.0 - 2.0)
+#   0.0-0.3:  Focused, deterministic
+#   0.4-0.9:  Balanced (recommended)
+#   1.0-2.0:  Creative, diverse
+temperature: 0.7
+
+# Maximum tokens per response
+#   256:   Short answers
+#   1024:  Medium responses
+#   2048:  Long responses (default)
+#   4096:  Very long (if supported)
+max_tokens: 2048
+
+# System prompt: Defines AI behavior and expertise
+# Default: Expert software engineer focused on code delivery
+# 
+# The default prompt guides the AI to:
+#   - Follow language-specific best practices and conventions
+#   - Write clean, production-ready code with inline comments
+#   - Break complex tasks into subtasks before implementing
+#   - Provide code solutions directly without verbose explanations
+#   - Ask clarifying questions when needed
+#
+# Customize this to change the AI's personality, expertise, or focus area.
+# Examples:
+#   - "You are a Python expert. Provide code solutions with minimal explanation."
+#   - "You are a DevOps engineer. Write infrastructure code directly."
+#   - "You are a code reviewer. Point out issues concisely with fixes."
+#
+# Leave commented to use the default coding assistant prompt.
+#system_prompt: "You are an expert software engineer and coding assistant..."
+
+# ============================================================================
+# LocalAI Setup Guide (Recommended for Privacy & Zero Cost)
+# ============================================================================
+#
+# Why LocalAI?
+# -----------
+# ✓ Complete privacy - data never leaves your machine
+# ✓ Zero cost - no API fees
+# ✓ Offline - works without internet
+# ✓ No API key needed - simplified setup
+# ✓ Full control - choose your models
+#
+# Quick Start (5 minutes):
+# ------------------------
+#
+# 1. Start LocalAI with Docker:
+#
+#    CPU version (any machine):
+#      docker run -p 8080:8080 --name localai -d \
+#        localai/localai:latest-aio-cpu
+#
+#    GPU version (NVIDIA GPU, 3-5x faster):
+#      docker run -p 8080:8080 --gpus all --name localai -d \
+#        localai/localai:latest-aio-gpu-nvidia-cuda-12
+#
+# 2. Wait for initial setup (5-10 minutes on first run)
+#    Models are downloaded automatically
+#
+# 3. Verify LocalAI is ready:
+#      curl http://localhost:8080/v1/models
+#
+# 4. Configure EmmAI (this file or environment):
+#      base_url: http://localhost:8080
+#      model: gpt-3.5-turbo
+#      api_key: ""  # Empty is OK!
+#
+#    Or use environment variables:
+#      export OPENAI_BASE_URL="http://localhost:8080"
+#      export OPENAI_API_KEY=""  # Empty string is fine
+#
+# 5. Run EmmAI:
+#      ./bin/emmai
+#
+# 6. Verify custom endpoint in status bar:
+#      EmmAI - gpt-3.5-turbo (Custom) | Tokens: 0
+#                            ^^^^^^^^
+#
+# Managing Models:
+# ---------------
+#
+# List available models:
+#   docker exec localai local-ai models list
+#
+# Install specific models:
+#   docker exec localai local-ai models install llama2
+#   docker exec localai local-ai models install mistral
+#   docker exec localai local-ai models install codellama
+#
+# Use installed model:
+#   Update config: model: llama-2-7b
+#
+# Performance Tips:
+# ----------------
+# - GPU version: 3-5x faster with NVIDIA GPU
+# - Smaller models (7B): Faster, less memory
+# - Larger models (13B+): Better quality, slower
+# - Reduce max_tokens for faster responses
+#
+# Troubleshooting:
+# ---------------
+#
+# Connection refused:
+#   Check container: docker ps
+#   Verify endpoint: curl http://localhost:8080/v1/models
+#   Restart: docker restart localai
+#
+# Slow responses:
+#   Use GPU-enabled Docker image
+#   Try smaller models (7B instead of 13B)
+#   Lower max_tokens
+#
+# Model not found:
+#   List models: curl http://localhost:8080/v1/models
+#   Use exact model name from list
+#
+# Out of memory:
+#   Use smaller models (7B)
+#   Close other applications
+#   Increase Docker memory limit
+#
+# Self-signed certificate errors:
+#   Set: insecure_skip_verify: true
+#   Or: export OPENAI_INSECURE_SKIP_VERIFY=true
+#
+# Resources:
+# ---------
+# Documentation: https://localai.io/basics/getting_started/
+# Model Gallery: https://localai.io/models/
+# GitHub: https://github.com/mudler/LocalAI
+# Discord: https://discord.gg/uJAeKSAGDy
+#
+# ============================================================================
