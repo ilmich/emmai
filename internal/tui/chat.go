@@ -117,17 +117,17 @@ func (cv *ChatView) render() {
 		switch msg.Role {
 		case "user":
 			builder.WriteString(fmt.Sprintf("[%s]You:[white] %s",
-				ColorUserStr, msg.Content))
+				ColorUserStr, tview.Escape(msg.Content)))
 		case "assistant":
 			builder.WriteString(fmt.Sprintf("[%s]Assistant:[white] %s",
-				ColorAssistantStr, msg.Content))
+				ColorAssistantStr, tview.Escape(msg.Content)))
 			// Add cursor for streaming
 			if i == len(cv.messages)-1 && msg.Content != "" {
 				builder.WriteString("[white]▊")
 			}
 		case "error":
 			builder.WriteString(fmt.Sprintf("[%s]Error:[white] %s",
-				ColorErrorStr, msg.Content))
+				ColorErrorStr, tview.Escape(msg.Content)))
 		}
 	}
 
