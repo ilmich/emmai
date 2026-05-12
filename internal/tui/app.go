@@ -8,6 +8,7 @@ import (
 	"github.com/ilmich/emmai/internal/client"
 	"github.com/ilmich/emmai/internal/config"
 	"github.com/ilmich/emmai/internal/storage"
+	"github.com/ilmich/emmai/internal/tools"
 	"github.com/rivo/tview"
 )
 
@@ -28,6 +29,7 @@ type App struct {
 	cancel           context.CancelFunc
 	streamCtx        context.Context
 	streamCancel     context.CancelFunc
+	toolExecutor     *client.SimpleToolExecutor
 }
 
 // NewApp creates a new TUI application
@@ -67,6 +69,9 @@ func NewApp(cfg *config.Config, aiClient *client.OpenAIClient) *App {
 
 	// Load most recent conversation if available
 	tuiApp.loadRecentConversation()
+
+	// Set up coding tools
+	tuiApp.setupCodingTools()
 
 	return tuiApp
 }
@@ -275,4 +280,24 @@ func (a *App) Shutdown() {
 
 	a.cancel()
 	a.app.Stop()
+}
+
+// setupCodingTools registers all coding assistant tools
+func (a *App) setupCodingTools() {
+	// Register file tools
+	fileTools := tools.NewFileTools()
+	for _, tool := range fileTools {
+		a.client.RegisterTool(tool)
+	}
+
+	// Create tool executor
+	executor := client.NewSimpleToolExecutor()
+
+	// Register file tool handlers
+	fileExecutor := tools.NewFileToolsExecutor()
+	fileExecutor.RegisterHandlers(executor)
+
+	// Set executor on client
+	a.client.SetToolExecutor(executor)
+	a.toolExecutor = executor
 }
