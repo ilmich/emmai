@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -206,10 +207,36 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 		// If there are tool calls, execute them
 		if len(toolCalls) > 0 && c.toolExecutor != nil {
 			for _, tc := range toolCalls {
+				// Show tool call feedback to user
+				textChan <- fmt.Sprintf("\n🔧 Calling %s\n", tc.Function.Name)
+				
+				// Show arguments if not too long
+				args := tc.Function.Arguments
+				if len(args) <= 200 {
+					textChan <- fmt.Sprintf("   %s\n", args)
+				} else {
+					textChan <- fmt.Sprintf("   %s...\n", args[:197])
+				}
+				
 				// Execute the tool
 				result, err := c.toolExecutor.Execute(tc.Function.Name, tc.Function.Arguments)
 				if err != nil {
+					textChan <- fmt.Sprintf("❌ Error: %v\n\n", err)
 					result = fmt.Sprintf("Error executing tool: %v", err)
+				} else {
+					// Show success with result summary for list_files
+					if tc.Function.Name == "list_files" {
+						var resultData struct {
+							Files []string `json:"files"`
+						}
+						if jsonErr := json.Unmarshal([]byte(result), &resultData); jsonErr == nil {
+							textChan <- fmt.Sprintf("✅ Found %d file(s)\n\n", len(resultData.Files))
+						} else {
+							textChan <- "✅ Completed\n\n"
+						}
+					} else {
+						textChan <- "✅ Completed\n\n"
+					}
 				}
 
 				// Add tool response to conversation
