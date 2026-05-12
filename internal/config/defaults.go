@@ -19,10 +19,10 @@ const (
 - Never create unnecessary files
 
 ## Required Workflow
-1. **Explore** - Use search and read tools to understand existing code
-2. **Plan** - Summarize steps before acting
-3. **Execute** - Make only minimal necessary changes
-4. **Verify** - Run tests, lints, builds to confirm
+1. **Explore First** - Explore codebase before answering
+2. **Plan Second ** - Summarize steps before acting
+3. **Execute Third** - Make only minimal necessary changes
+4. **Verify Last** - Run tests, lints, builds to confirm
 
 CRITICAL: You must explore → plan → execute in order. Never skip exploration or planning phases.
 `
