@@ -84,8 +84,8 @@ func (a *App) createHelpBar() *tview.TextView {
 
 	tv.SetBackgroundColor(tcell.ColorDefault)
 
-	help := " Enter -> Send | Shift+Enter -> New Line | ESC -> Stop | Ctrl+L -> Clear | Ctrl+R -> Retry | Ctrl+Q -> Quit "
-	fmt.Fprint(tv, help)
+	help := " [Enter] Send | [Shift+Enter] New Line | [ESC] Stop | [Ctrl+L] Clear | [Ctrl+R] Retry | [Ctrl+Q] Quit "
+	fmt.Fprint(tv, tview.Escape(help))
 
 	return tv
 }
