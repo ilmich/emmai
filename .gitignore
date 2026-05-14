@@ -1,0 +1,38 @@
+# Binaries
+bin/
+emmai
+*.exe
+*.dll
+*.so
+*.dylib
+*.yml
+*.json
+
+# Config files with API keys
+config.yaml
+*.local.yaml
+
+# User data directory
+.emmai/
+
+# Test files
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Vendor
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

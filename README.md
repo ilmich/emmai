@@ -36,7 +36,7 @@ A terminal user interface (TUI) for chatting with any OpenAI-compatible API serv
 ## Prerequisites
 
 - Go 1.21 or higher
-- OpenAI API key ([get one here](https://platform.openai.com/api-keys)) *or* a custom OpenAI-compatible endpoint
+- OpenAI-compatible endpoint
 
 ## Installation
 
@@ -171,13 +171,6 @@ Each conversation includes:
 - Model used
 - Timestamps
 - Unique conversation ID
-
-### Configuration
-
-Configuration file location:
-```
-~/.emmai/config.yaml
-```
 
 ## Contributing
 
