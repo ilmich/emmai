@@ -7,7 +7,7 @@ func NewFileTools() []client.Tool {
 	return []client.Tool{
 		client.NewFunctionTool(
 			"list_files",
-			"Find files matching a glob pattern in the codebase for code exploration and understanding project structure.",
+			"Find files matching a glob pattern in the codebase for code exploration and understanding project structure. If no results the project is empty",
 			map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{

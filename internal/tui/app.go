@@ -7,6 +7,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/ilmich/emmai/internal/client"
 	"github.com/ilmich/emmai/internal/config"
+	"github.com/ilmich/emmai/internal/phase"
 	"github.com/ilmich/emmai/internal/storage"
 	"github.com/ilmich/emmai/internal/tools"
 	"github.com/rivo/tview"
@@ -17,6 +18,7 @@ type App struct {
 	app              *tview.Application
 	client           *client.OpenAIClient
 	config           *config.Config
+	phaseManager     *phase.Manager
 	bannerView       *BannerView
 	systemMessageBar *SystemMessageBar
 	chatView         *ChatView
@@ -37,10 +39,14 @@ func NewApp(cfg *config.Config, aiClient *client.OpenAIClient) *App {
 	app := tview.NewApplication()
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Create phase manager
+	phaseManager := phase.NewManager(cfg.Phases, cfg.InitialPhase)
+
 	tuiApp := &App{
 		app:          app,
 		client:       aiClient,
 		config:       cfg,
+		phaseManager: phaseManager,
 		isProcessing: false,
 		ctx:          ctx,
 		cancel:       cancel,
@@ -73,7 +79,33 @@ func NewApp(cfg *config.Config, aiClient *client.OpenAIClient) *App {
 	// Set up coding tools
 	tuiApp.setupCodingTools()
 
+	// Auto-inject initial phase
+	tuiApp.initializePhase()
+
 	return tuiApp
+}
+
+// initializePhase automatically injects the initial phase prompt
+func (a *App) initializePhase() {
+	initialPhase := a.phaseManager.GetInitialPhase()
+	if initialPhase == "" {
+		return
+	}
+
+	// Start the initial phase
+	response, err := a.phaseManager.StartPhase(initialPhase)
+	if err != nil {
+		// Log error but don't fail - app can work without phases
+		fmt.Printf("Warning: Failed to initialize phase %s: %v\n", initialPhase, err)
+		return
+	}
+
+	// Inject phase prompt into client
+	a.client.SetPhasePrompt(response.Prompt)
+
+	// Set allowed tools for initial phase
+	allowedTools := a.phaseManager.GetCurrentPhaseAllowedTools()
+	a.client.SetPhaseAllowedTools(allowedTools)
 }
 
 // createHelpBar creates the help bar at the bottom
@@ -227,6 +259,9 @@ func (a *App) clearConversation() {
 	a.chatView.Clear()
 	a.statusBar.SetTokens(0)
 
+	// Reset to initial phase
+	a.initializePhase()
+
 	a.systemMessageBar.SetMessage("Started new conversation")
 }
 
@@ -290,12 +325,22 @@ func (a *App) setupCodingTools() {
 		a.client.RegisterTool(tool)
 	}
 
+	// Register phase tools
+	phaseTools := tools.NewPhaseTools()
+	for _, tool := range phaseTools {
+		a.client.RegisterTool(tool)
+	}
+
 	// Create tool executor
 	executor := client.NewSimpleToolExecutor()
 
 	// Register file tool handlers
 	fileExecutor := tools.NewFileToolsExecutor()
 	fileExecutor.RegisterHandlers(executor)
+
+	// Register phase tool handlers
+	phaseExecutor := tools.NewPhaseToolsExecutor(a.phaseManager, a.client)
+	phaseExecutor.RegisterHandlers(executor)
 
 	// Set executor on client
 	a.client.SetToolExecutor(executor)

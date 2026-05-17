@@ -10,15 +10,50 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// PhaseConfig represents a single phase in the workflow
+type PhaseConfig struct {
+	Name         string   `yaml:"name"`
+	Prompt       string   `yaml:"prompt"`
+	NextPhase    string   `yaml:"next_phase,omitempty"`
+	ReadOnly     bool     `yaml:"read_only"`
+	AllowedTools []string `yaml:"allowed_tools"`
+}
+
+// GetAllowedTools returns the list of tools allowed in this phase
+// start_phase is automatically injected and doesn't need to be configured
+func (p *PhaseConfig) GetAllowedTools() []string {
+	// Always ensure start_phase is included (automatic injection)
+	tools := make([]string, 0, len(p.AllowedTools)+1)
+	tools = append(tools, p.AllowedTools...)
+
+	// Check if start_phase already in list
+	hasStartPhase := false
+	for _, tool := range p.AllowedTools {
+		if tool == "start_phase" {
+			hasStartPhase = true
+			break
+		}
+	}
+
+	// Auto-inject start_phase if not present
+	if !hasStartPhase {
+		tools = append(tools, "start_phase")
+	}
+
+	return tools
+}
+
 // Config holds the application configuration
 type Config struct {
-	APIKey             string  `yaml:"api_key"`
-	BaseURL            string  `yaml:"base_url"`
-	InsecureSkipVerify bool    `yaml:"insecure_skip_verify"`
-	Model              string  `yaml:"model"`
-	Temperature        float32 `yaml:"temperature"`
-	MaxTokens          int     `yaml:"max_tokens"`
-	SystemPrompt       string  `yaml:"system_prompt"`
+	APIKey             string        `yaml:"api_key"`
+	BaseURL            string        `yaml:"base_url"`
+	InsecureSkipVerify bool          `yaml:"insecure_skip_verify"`
+	Model              string        `yaml:"model"`
+	Temperature        float32       `yaml:"temperature"`
+	MaxTokens          int           `yaml:"max_tokens"`
+	SystemPrompt       string        `yaml:"system_prompt"`
+	Phases             []PhaseConfig `yaml:"phases,omitempty"`
+	InitialPhase       string        `yaml:"initial_phase,omitempty"`
 }
 
 // Load reads configuration from file and environment variables
@@ -31,6 +66,8 @@ func Load() (*Config, error) {
 		Temperature:        DefaultTemperature,
 		MaxTokens:          DefaultMaxTokens,
 		SystemPrompt:       DefaultSystemPrompt,
+		Phases:             DefaultPhases,
+		InitialPhase:       DefaultInitialPhase,
 	}
 
 	// Try to load from config file

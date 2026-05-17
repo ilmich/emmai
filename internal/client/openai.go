@@ -15,12 +15,14 @@ import (
 
 // OpenAIClient wraps the OpenAI API client
 type OpenAIClient struct {
-	client       *openai.Client
-	config       *config.Config
-	conversation *Conversation
-	toolRegistry *ToolRegistry
-	toolExecutor ToolExecutor
-	toolChoice   ToolChoice
+	client                   *openai.Client
+	config                   *config.Config
+	conversation             *Conversation
+	toolRegistry             *ToolRegistry
+	toolExecutor             ToolExecutor
+	toolChoice               ToolChoice
+	phasePrompt              string   // Current phase-specific prompt
+	currentPhaseAllowedTools []string // Tools allowed in current phase
 }
 
 // NewOpenAIClient creates a new OpenAI client
@@ -50,11 +52,13 @@ func NewOpenAIClient(cfg *config.Config) (*OpenAIClient, error) {
 	}
 
 	return &OpenAIClient{
-		client:       openai.NewClientWithConfig(clientConfig),
-		config:       cfg,
-		conversation: NewConversation(cfg.Model),
-		toolRegistry: NewToolRegistry(),
-		toolChoice:   "auto", // Default to auto tool selection
+		client:                   openai.NewClientWithConfig(clientConfig),
+		config:                   cfg,
+		conversation:             NewConversation(cfg.Model),
+		toolRegistry:             NewToolRegistry(),
+		toolChoice:               "auto", // Default to auto tool selection
+		phasePrompt:              "",     // No phase prompt initially
+		currentPhaseAllowedTools: []string{}, // No phase filtering initially
 	}, nil
 }
 
@@ -95,7 +99,8 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 
 		// Add tools if any are registered
 		if c.toolRegistry.HasTools() {
-			tools := c.toolRegistry.GetAllTools()
+			// Get filtered tools based on current phase
+			tools := c.getFilteredTools()
 			openaiTools := make([]openai.Tool, len(tools))
 			for i, tool := range tools {
 				openaiTools[i] = openai.Tool{
@@ -262,8 +267,14 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 func (c *OpenAIClient) buildAPIMessages() []openai.ChatCompletionMessage {
 	messages := make([]openai.ChatCompletionMessage, 0, len(c.conversation.Messages)+1)
 
+	// Build complete system prompt: base + phase
+	systemPrompt := c.config.SystemPrompt
+	if c.phasePrompt != "" {
+		systemPrompt = systemPrompt + "\n\n" + c.phasePrompt
+	}
+
 	// Add system prompt if configured and not already in history
-	if c.config.SystemPrompt != "" {
+	if systemPrompt != "" {
 		hasSystemMessage := false
 		for _, msg := range c.conversation.Messages {
 			if msg.Role == "system" {
@@ -274,7 +285,7 @@ func (c *OpenAIClient) buildAPIMessages() []openai.ChatCompletionMessage {
 		if !hasSystemMessage {
 			messages = append(messages, openai.ChatCompletionMessage{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: c.config.SystemPrompt,
+				Content: systemPrompt,
 			})
 		}
 	}
@@ -339,6 +350,9 @@ func (c *OpenAIClient) GetTokenCount() int {
 	if c.config.SystemPrompt != "" {
 		total += len(c.config.SystemPrompt) / 4
 	}
+	if c.phasePrompt != "" {
+		total += len(c.phasePrompt) / 4
+	}
 	return total
 }
 
@@ -361,4 +375,43 @@ func (c *OpenAIClient) SetToolChoice(choice ToolChoice) {
 // GetToolRegistry returns the tool registry
 func (c *OpenAIClient) GetToolRegistry() *ToolRegistry {
 	return c.toolRegistry
+}
+
+// SetPhasePrompt updates the current phase-specific prompt
+func (c *OpenAIClient) SetPhasePrompt(prompt string) {
+	c.phasePrompt = prompt
+}
+
+// GetPhasePrompt returns the current phase prompt
+func (c *OpenAIClient) GetPhasePrompt() string {
+	return c.phasePrompt
+}
+
+// SetPhaseAllowedTools updates the allowed tools for the current phase
+func (c *OpenAIClient) SetPhaseAllowedTools(allowedTools []string) {
+	c.currentPhaseAllowedTools = allowedTools
+}
+
+// getFilteredTools returns tools filtered by phase allowed list
+func (c *OpenAIClient) getFilteredTools() []Tool {
+	// If no phase filtering is active, return all tools
+	if len(c.currentPhaseAllowedTools) == 0 {
+		return c.toolRegistry.GetAllTools()
+	}
+
+	// Create lookup map for fast checking
+	allowed := make(map[string]bool)
+	for _, name := range c.currentPhaseAllowedTools {
+		allowed[name] = true
+	}
+
+	// Filter tools
+	filtered := make([]Tool, 0)
+	for _, tool := range c.toolRegistry.GetAllTools() {
+		if allowed[tool.Function.Name] {
+			filtered = append(filtered, tool)
+		}
+	}
+
+	return filtered
 }
