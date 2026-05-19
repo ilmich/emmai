@@ -32,6 +32,7 @@ type App struct {
 	streamCtx        context.Context
 	streamCancel     context.CancelFunc
 	toolExecutor     *client.SimpleToolExecutor
+	phaseExecutor    *tools.PhaseToolsExecutor
 }
 
 // NewApp creates a new TUI application
@@ -150,9 +151,16 @@ func (a *App) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 
 	case event.Key() == tcell.KeyEsc:
-		// Interrupt streaming
+		// First ESC: Interrupt streaming
 		if a.isProcessing {
 			a.interruptStreaming()
+			return nil
+		}
+
+		// Second ESC (when not processing): Reset to initial phase
+		if a.phaseExecutor != nil {
+			_ = a.phaseExecutor.ResetPhase()
+			// Silent reset - no message shown to user
 		}
 		return nil
 	}
@@ -192,14 +200,18 @@ func (a *App) handleSendMessage(message string) {
 	go func() {
 		for {
 			select {
-			case <-a.streamCtx.Done():
-				// Stream was interrupted by ESC key
-				a.app.QueueUpdateDraw(func() {
-					// Remove the partial streaming message
-					a.chatView.RemoveLastMessage()
-					a.finishProcessing()
-				})
-				return
+		case <-a.streamCtx.Done():
+			// Stream was interrupted by ESC key
+			a.app.QueueUpdateDraw(func() {
+				// Remove the partial streaming message
+				a.chatView.RemoveLastMessage()
+				// Remove the user message from UI
+				a.chatView.RemoveLastMessage()
+				// Remove the user message from conversation history
+				a.client.RemoveLastUserMessage()
+				a.finishProcessing()
+			})
+			return
 
 			case chunk, ok := <-textChan:
 				if !ok {
@@ -339,8 +351,8 @@ func (a *App) setupCodingTools() {
 	fileExecutor.RegisterHandlers(executor)
 
 	// Register phase tool handlers
-	phaseExecutor := tools.NewPhaseToolsExecutor(a.phaseManager, a.client)
-	phaseExecutor.RegisterHandlers(executor)
+	a.phaseExecutor = tools.NewPhaseToolsExecutor(a.phaseManager, a.client)
+	a.phaseExecutor.RegisterHandlers(executor)
 
 	// Set executor on client
 	a.client.SetToolExecutor(executor)

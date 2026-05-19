@@ -58,6 +58,11 @@ func (m *Manager) StartPhase(phaseName string) (*PhaseResponse, error) {
 	}, nil
 }
 
+// ResetToInitial resets the workflow to the initial phase
+func (m *Manager) ResetToInitial() (*PhaseResponse, error) {
+	return m.StartPhase(m.initialPhase)
+}
+
 // IsReadOnly returns whether the current phase allows modifications
 func (m *Manager) IsReadOnly() bool {
 	if m.currentPhase == "" {

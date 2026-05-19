@@ -144,7 +144,7 @@ IMPORTANT: If you encounter issues or need to deviate from the plan, STOP and as
 	{
 		Name:      "verify",
 		ReadOnly:  true,
-		NextPhase: "",
+		NextPhase: "explore",
 		AllowedTools: []string{
 			"list_files",
 			"read_file",
@@ -185,6 +185,8 @@ Final Summary Format:
 If verification fails: Report the issues and ask user how to proceed (fix, rollback, or accept as-is).
 
 This is the final phase. Provide a comprehensive report before completing the task.
+
+IMPORTANT: After providing the final summary, call start_phase("explore") to reset for the next task.
 `,
 	},
 }

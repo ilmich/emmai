@@ -340,6 +340,11 @@ func (c *OpenAIClient) ClearConversation() {
 	c.conversation = NewConversation(c.config.Model)
 }
 
+// RemoveLastUserMessage removes the last user message from conversation
+func (c *OpenAIClient) RemoveLastUserMessage() {
+	c.conversation.RemoveLastUserMessage()
+}
+
 // GetTokenCount estimates the number of tokens used
 func (c *OpenAIClient) GetTokenCount() int {
 	// Rough estimate: ~4 characters per token

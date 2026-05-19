@@ -81,6 +81,20 @@ func (c *Conversation) GetLastUserMessage() string {
 	return ""
 }
 
+// RemoveLastUserMessage removes the most recent user message from the conversation
+func (c *Conversation) RemoveLastUserMessage() bool {
+	// Search backwards to find the last user message
+	for i := len(c.Messages) - 1; i >= 0; i-- {
+		if c.Messages[i].Role == "user" {
+			// Remove the message by slicing around it
+			c.Messages = append(c.Messages[:i], c.Messages[i+1:]...)
+			c.Updated = time.Now()
+			return true
+		}
+	}
+	return false // No user message found
+}
+
 // Clear removes all messages from the conversation
 func (c *Conversation) Clear() {
 	c.Messages = make([]Message, 0)

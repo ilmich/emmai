@@ -65,3 +65,18 @@ func (e *PhaseToolsExecutor) handleStartPhase(args map[string]interface{}) (stri
 
 	return string(jsonResponse), nil
 }
+
+// ResetPhase resets the workflow to the initial phase
+func (e *PhaseToolsExecutor) ResetPhase() error {
+	response, err := e.phaseManager.ResetToInitial()
+	if err != nil {
+		return err
+	}
+
+	// Update client with initial phase settings
+	e.client.SetPhasePrompt(response.Prompt)
+	allowedTools := e.phaseManager.GetCurrentPhaseAllowedTools()
+	e.client.SetPhaseAllowedTools(allowedTools)
+
+	return nil
+}
