@@ -348,6 +348,10 @@ func (a *App) setupCodingTools() {
 	searchTool := file.NewSearchFilesTool()
 	a.client.RegisterTool(searchTool)
 
+	// Register glob_files tool
+	globTool := file.NewGlobFilesTool()
+	a.client.RegisterTool(globTool)
+
 	// Register edit_file tool
 	editTool := file.NewEditFileTool()
 	a.client.RegisterTool(editTool)
@@ -370,6 +374,10 @@ func (a *App) setupCodingTools() {
 	// Register search_files handler
 	searchExecutor := file.NewSearchExecutor(wd)
 	executor.RegisterHandler("search_files", searchExecutor.HandleSearchFiles)
+
+	// Register glob_files handler
+	globExecutor := file.NewGlobExecutor(wd)
+	executor.RegisterHandler("glob_files", globExecutor.HandleGlobFiles)
 
 	// Register edit_file handler
 	editExecutor := file.NewEditExecutor(wd)

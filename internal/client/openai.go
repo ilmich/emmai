@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -214,13 +215,9 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 				// Show tool call feedback to user
 				textChan <- fmt.Sprintf("\n🔧 Calling %s\n", tc.Function.Name)
 				
-				// Show arguments if not too long
-				args := tc.Function.Arguments
-				if len(args) <= 200 {
-					textChan <- fmt.Sprintf("   %s\n", args)
-				} else {
-					textChan <- fmt.Sprintf("   %s...\n", args[:197])
-				}
+				// Pretty-print arguments with 80-char line limit
+				formattedArgs := formatToolArguments(tc.Function.Arguments)
+				textChan <- fmt.Sprintf("%s\n", formattedArgs)
 				
 				// Execute the tool
 				result, err := c.toolExecutor.Execute(tc.Function.Name, tc.Function.Arguments)
@@ -406,4 +403,60 @@ func (c *OpenAIClient) getFilteredTools() []Tool {
 	}
 
 	return filtered
+}
+
+// formatToolArguments formats JSON arguments for readable display with 80-char lines
+func formatToolArguments(jsonStr string) string {
+	var data interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		// If parsing fails, return original with indent
+		return "   " + jsonStr
+	}
+
+	// Truncate long strings and limit arrays
+	processed := processJSONForDisplay(data)
+
+	// Pretty print with 2-space indent, base indent of 3 spaces
+	prettyJSON, err := json.MarshalIndent(processed, "   ", "  ")
+	if err != nil {
+		return "   " + jsonStr
+	}
+
+	return string(prettyJSON)
+}
+
+// processJSONForDisplay recursively processes JSON data for display:
+// - Truncates strings longer than 60 chars
+// - Limits arrays to first 10 items
+func processJSONForDisplay(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for key, val := range v {
+			result[key] = processJSONForDisplay(val)
+		}
+		return result
+
+	case []interface{}:
+		// Limit arrays to 10 items
+		limit := len(v)
+		if limit > 10 {
+			limit = 10
+		}
+		result := make([]interface{}, limit)
+		for i := 0; i < limit; i++ {
+			result[i] = processJSONForDisplay(v[i])
+		}
+		return result
+
+	case string:
+		// Truncate strings longer than 60 chars
+		if len(v) > 60 {
+			return v[:60] + "..."
+		}
+		return v
+
+	default:
+		return v
+	}
 }
