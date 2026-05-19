@@ -3,13 +3,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/ilmich/emmai/internal/client"
 	"github.com/ilmich/emmai/internal/config"
 	"github.com/ilmich/emmai/internal/phase"
 	"github.com/ilmich/emmai/internal/storage"
-	"github.com/ilmich/emmai/internal/tools"
+	"github.com/ilmich/emmai/internal/tools/execution"
+	"github.com/ilmich/emmai/internal/tools/file"
+	phasetool "github.com/ilmich/emmai/internal/tools/phase"
 	"github.com/rivo/tview"
 )
 
@@ -32,7 +35,7 @@ type App struct {
 	streamCtx        context.Context
 	streamCancel     context.CancelFunc
 	toolExecutor     *client.SimpleToolExecutor
-	phaseExecutor    *tools.PhaseToolsExecutor
+	phaseExecutor    *phasetool.PhaseExecutor
 }
 
 // NewApp creates a new TUI application
@@ -331,28 +334,54 @@ func (a *App) Shutdown() {
 
 // setupCodingTools registers all coding assistant tools
 func (a *App) setupCodingTools() {
-	// Register file tools
-	fileTools := tools.NewFileTools()
-	for _, tool := range fileTools {
-		a.client.RegisterTool(tool)
+	// Get working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		wd = "."
 	}
 
-	// Register phase tools
-	phaseTools := tools.NewPhaseTools()
-	for _, tool := range phaseTools {
-		a.client.RegisterTool(tool)
-	}
+	// Register read_file tool
+	readTool := file.NewReadFileTool()
+	a.client.RegisterTool(readTool)
+
+	// Register search_files tool
+	searchTool := file.NewSearchFilesTool()
+	a.client.RegisterTool(searchTool)
+
+	// Register edit_file tool
+	editTool := file.NewEditFileTool()
+	a.client.RegisterTool(editTool)
+
+	// Register run_command tool
+	commandTool := execution.NewRunCommandTool()
+	a.client.RegisterTool(commandTool)
+
+	// Register start_phase tool
+	phaseTool := phasetool.NewPhaseTool()
+	a.client.RegisterTool(phaseTool)
 
 	// Create tool executor
 	executor := client.NewSimpleToolExecutor()
 
-	// Register file tool handlers
-	fileExecutor := tools.NewFileToolsExecutor()
-	fileExecutor.RegisterHandlers(executor)
+	// Register read_file handler
+	readExecutor := file.NewReadExecutor(wd)
+	executor.RegisterHandler("read_file", readExecutor.HandleReadFile)
 
-	// Register phase tool handlers
-	a.phaseExecutor = tools.NewPhaseToolsExecutor(a.phaseManager, a.client)
-	a.phaseExecutor.RegisterHandlers(executor)
+	// Register search_files handler
+	searchExecutor := file.NewSearchExecutor(wd)
+	executor.RegisterHandler("search_files", searchExecutor.HandleSearchFiles)
+
+	// Register edit_file handler
+	editExecutor := file.NewEditExecutor(wd)
+	executor.RegisterHandler("edit_file", editExecutor.HandleEditFile)
+
+	// Register run_command handler
+	commandExecutor := execution.NewCommandExecutor(wd, &a.config.Security.CommandExecution, a.phaseManager)
+	executor.RegisterHandler("run_command", commandExecutor.HandleRunCommand)
+
+	// Register start_phase handler
+	a.phaseExecutor = phasetool.NewPhaseExecutor(a.phaseManager, a.client)
+	executor.RegisterHandler("start_phase", a.phaseExecutor.HandleStartPhase)
 
 	// Set executor on client
 	a.client.SetToolExecutor(executor)

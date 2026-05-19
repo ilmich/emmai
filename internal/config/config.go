@@ -43,6 +43,30 @@ func (p *PhaseConfig) GetAllowedTools() []string {
 	return tools
 }
 
+// SecurityPolicy holds security settings for tools
+type SecurityPolicy struct {
+	CommandExecution CommandExecutionPolicy `yaml:"command_execution"`
+}
+
+// CommandExecutionPolicy configures command execution security
+type CommandExecutionPolicy struct {
+	Enabled              bool             `yaml:"enabled"`
+	AllowedCommands      []AllowedCommand `yaml:"allowed_commands"`
+	DefaultTimeoutSec    int              `yaml:"default_timeout_seconds"`
+	MaxTimeoutSec        int              `yaml:"max_timeout_seconds"`
+	MaxConcurrent        int              `yaml:"max_concurrent_commands"`
+	BlockedDirectories   []string         `yaml:"blocked_directories"`
+	MaxOutputSizeBytes   int              `yaml:"max_output_size_bytes"`
+}
+
+// AllowedCommand defines a whitelisted command with restrictions
+type AllowedCommand struct {
+	Prefix        string   `yaml:"prefix"`
+	Subcommands   []string `yaml:"subcommands,omitempty"`
+	BlockedArgs   []string `yaml:"blocked_args,omitempty"`
+	AllowedPhases []string `yaml:"allowed_phases,omitempty"`
+}
+
 // Config holds the application configuration
 type Config struct {
 	APIKey             string        `yaml:"api_key"`
@@ -54,6 +78,7 @@ type Config struct {
 	SystemPrompt       string        `yaml:"system_prompt"`
 	Phases             []PhaseConfig `yaml:"phases,omitempty"`
 	InitialPhase       string        `yaml:"initial_phase,omitempty"`
+	Security           SecurityPolicy `yaml:"security,omitempty"`
 }
 
 // Load reads configuration from file and environment variables
@@ -68,6 +93,7 @@ func Load() (*Config, error) {
 		SystemPrompt:       DefaultSystemPrompt,
 		Phases:             DefaultPhases,
 		InitialPhase:       DefaultInitialPhase,
+		Security:           DefaultSecurityPolicy(),
 	}
 
 	// Try to load from config file

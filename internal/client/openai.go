@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -229,19 +228,7 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 					textChan <- fmt.Sprintf("❌ Error: %v\n\n", err)
 					result = fmt.Sprintf("Error executing tool: %v", err)
 				} else {
-					// Show success with result summary for list_files
-					if tc.Function.Name == "list_files" {
-						var resultData struct {
-							Files []string `json:"files"`
-						}
-						if jsonErr := json.Unmarshal([]byte(result), &resultData); jsonErr == nil {
-							textChan <- fmt.Sprintf("✅ Found %d file(s)\n\n", len(resultData.Files))
-						} else {
-							textChan <- "✅ Completed\n\n"
-						}
-					} else {
-						textChan <- "✅ Completed\n\n"
-					}
+					textChan <- "✅ Completed\n\n"
 				}
 
 				// Add tool response to conversation

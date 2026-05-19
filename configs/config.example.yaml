@@ -139,6 +139,9 @@ initial_phase: explore
 #   - list_files: Find files matching glob patterns
 #   - read_file: Read file contents
 #   - write_file: Write/create files
+#   - edit_file: Make surgical edits to files (NEW)
+#   - search_files: Search for patterns in files (NEW)
+#   - run_command: Execute commands (tests, builds, linters, git) (NEW)
 #   - start_phase: Transition between phases (automatically included, don't configure)
 #
 phases:
@@ -284,6 +287,50 @@ phases:
       If verification fails: Report the issues and ask user how to proceed (fix, rollback, or accept as-is).
       
       This is the final phase. Provide a comprehensive report before completing the task.
+
+# ----------------------------------------------------------------------------
+# Security Policy (Command Execution)
+# ----------------------------------------------------------------------------
+
+# Configure security policy for run_command tool
+# This controls what commands the AI can execute during builds, tests, and verification
+security:
+  command_execution:
+    # Enable/disable command execution (default: true)
+    enabled: true
+    
+    # Commands that can be executed by the AI
+    # Each command has a prefix, allowed subcommands, blocked arguments, and phase restrictions
+    allowed_commands:
+      # Go commands - build, test, format, vet
+      - prefix: "go"
+        subcommands: ["test", "build", "mod", "fmt", "vet", "get"]
+        blocked_args: ["run"]  # Block 'go run' for security
+        allowed_phases: ["execute", "verify"]
+      
+      # Git commands - read-only git operations
+      - prefix: "git"
+        subcommands: ["status", "diff", "log", "branch", "show"]
+        blocked_args: ["push", "pull", "clone", "reset"]  # Block destructive operations
+        allowed_phases: ["explore", "plan", "execute", "verify"]
+      
+      # Make commands - build and test
+      - prefix: "make"
+        subcommands: ["build", "test", "clean"]
+        allowed_phases: ["execute", "verify"]
+    
+    # Execution limits
+    default_timeout_seconds: 30   # Default timeout for commands
+    max_timeout_seconds: 120      # Maximum allowed timeout
+    max_concurrent_commands: 3    # Max simultaneous command executions
+    max_output_size_bytes: 1048576  # 1MB max output size
+    
+    # Path restrictions - directories that commands cannot access
+    blocked_directories:
+      - "/etc"
+      - "/root"
+      - "~/.ssh"
+      - "/var"
 
 # ============================================================================
 # LocalAI Setup Guide (Recommended for Privacy & Zero Cost)
