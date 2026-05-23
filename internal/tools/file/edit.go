@@ -75,7 +75,7 @@ func NewEditExecutor(workingDir string) *EditExecutor {
 func NewEditFileTool() client.Tool {
 	return client.NewFunctionTool(
 		"edit_file",
-		"Make surgical edits to files using hash-based line addressing. Read file with read_file first to get line hashes, then use those hashes to specify exact edit locations. Supports replace_lines, insert_after_hash, insert_before_hash, delete_by_hash, and create_file operations.",
+		"Make surgical edits to files using hash-based line addressing. ALWAYS call read_file first to get current line hashes, then use those exact hashes to specify edit locations. Operations: replace_lines (modify lines), insert_after_hash (add after line), insert_before_hash (add before line), delete_by_hash (remove lines), create_file (new file). Hash format: 8-char hex from read_file response. Never guess hashes - always use values from read_file.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{

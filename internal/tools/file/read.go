@@ -52,7 +52,7 @@ func NewReadExecutor(workingDir string) *ReadExecutor {
 func NewReadFileTool() client.Tool {
 	return client.NewFunctionTool(
 		"read_file",
-		"Read content of a file with line-by-line hashing for precise editing. Returns structured response with line numbers, hashes, and contents. Use the line hashes in edit_file operations.",
+		"Read file content with line-by-line hash identifiers for precise editing. Returns each line with a unique 8-char SHA-256 hash that you must use in edit_file operations to specify exact edit locations. Always read file before editing to get current hashes. Response includes line numbers, hashes, and content for each line.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{

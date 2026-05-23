@@ -20,27 +20,8 @@ type PhaseConfig struct {
 }
 
 // GetAllowedTools returns the list of tools allowed in this phase
-// start_phase is automatically injected and doesn't need to be configured
 func (p *PhaseConfig) GetAllowedTools() []string {
-	// Always ensure start_phase is included (automatic injection)
-	tools := make([]string, 0, len(p.AllowedTools)+1)
-	tools = append(tools, p.AllowedTools...)
-
-	// Check if start_phase already in list
-	hasStartPhase := false
-	for _, tool := range p.AllowedTools {
-		if tool == "start_phase" {
-			hasStartPhase = true
-			break
-		}
-	}
-
-	// Auto-inject start_phase if not present
-	if !hasStartPhase {
-		tools = append(tools, "start_phase")
-	}
-
-	return tools
+	return p.AllowedTools
 }
 
 // SecurityPolicy holds security settings for tools
