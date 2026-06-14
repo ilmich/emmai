@@ -7,8 +7,8 @@ import (
 	"github.com/ilmich/emmai/internal/storage"
 )
 
-// transitionPhaseCmd transitions to a new phase
-func transitionPhaseCmd(controller *phase.Controller, phaseName string) tea.Cmd {
+// transitionPhaseCmd transitions to a new phase. autoStart=true triggers AI immediately after.
+func transitionPhaseCmd(controller *phase.Controller, phaseName string, autoStart bool) tea.Cmd {
 	return func() tea.Msg {
 		resp, err := controller.TransitionToPhase(phaseName)
 		if err != nil {
@@ -20,6 +20,7 @@ func transitionPhaseCmd(controller *phase.Controller, phaseName string) tea.Cmd 
 		return phaseTransitionMsg{
 			phaseName: phaseName,
 			response:  resp,
+			autoStart: autoStart,
 		}
 	}
 }

@@ -23,6 +23,7 @@ type streamErrorMsg struct {
 type phaseTransitionMsg struct {
 	phaseName string
 	response  *phase.PhaseResponse
+	autoStart bool // if true, automatically trigger AI after transition
 }
 
 // phaseTransitionErrorMsg signals a phase transition failure

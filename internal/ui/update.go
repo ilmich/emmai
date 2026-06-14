@@ -121,6 +121,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		m.refreshViewportContent(m.formatMessage)
 		m.viewport.GotoBottom()
+		if msg.autoStart {
+			_, cmd := m.handleSendMessage("Begin.")
+			return m, cmd
+		}
 		return m, nil
 
 	case phaseTransitionErrorMsg:
@@ -272,15 +276,15 @@ func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
 	switch cmd {
 	case "/plan":
 		m.systemMessage = "Switching to PLAN phase..."
-		return m, transitionPhaseCmd(m.phaseController, "plan")
+		return m, transitionPhaseCmd(m.phaseController, "plan", false)
 
 	case "/execute":
 		m.systemMessage = "Switching to EXECUTE phase..."
-		return m, transitionPhaseCmd(m.phaseController, "execute")
+		return m, transitionPhaseCmd(m.phaseController, "execute", true)
 
 	case "/verify":
 		m.systemMessage = "Switching to VERIFY phase..."
-		return m, transitionPhaseCmd(m.phaseController, "verify")
+		return m, transitionPhaseCmd(m.phaseController, "verify", true)
 
 	case "/reset":
 		m.systemMessage = "Resetting to initial phase..."
