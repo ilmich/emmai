@@ -1,7 +1,8 @@
-package bubbletea
+package ui
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -41,10 +42,9 @@ type Model struct {
 	streamErrChan  <-chan error     // Active stream error channel
 
 	// UI State
-	width            int  // Terminal width
-	height           int  // Terminal height
-	ready            bool // Has received first WindowSizeMsg?
-	shouldAutoScroll bool // Should auto-scroll to bottom on next update
+	width  int  // Terminal width
+	height int  // Terminal height
+	ready  bool // Has received first WindowSizeMsg?
 
 	// Scrollbar positioning for mouse interaction
 	scrollbarX      int // X coordinate of scrollbar column in terminal
@@ -130,14 +130,12 @@ func (m *Model) updateComponentSizes() {
 // appendMessage adds a message to the chat history
 func (m *Model) appendMessage(msg client.Message) {
 	m.messages = append(m.messages, msg)
-	m.shouldAutoScroll = true
 }
 
 // appendToLastMessage appends text to the last message (for streaming)
 func (m *Model) appendToLastMessage(text string) {
 	if len(m.messages) > 0 {
 		m.messages[len(m.messages)-1].Content += text
-		m.shouldAutoScroll = true
 	}
 }
 
@@ -161,4 +159,17 @@ func (m *Model) startStreamingMessage() {
 func (m *Model) clearMessages() {
 	m.messages = []client.Message{}
 	m.viewport.SetContent("")
+}
+
+// refreshViewportContent rebuilds the viewport content from current messages.
+// Must be called on the real model (pointer receiver) whenever messages change.
+func (m *Model) refreshViewportContent(formatMessage func(msg client.Message, isLast bool) string) {
+	var sb strings.Builder
+	for i, msg := range m.messages {
+		if i > 0 {
+			sb.WriteString("\n\n")
+		}
+		sb.WriteString(formatMessage(msg, i == len(m.messages)-1))
+	}
+	m.viewport.SetContent(sb.String())
 }

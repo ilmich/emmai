@@ -1,4 +1,4 @@
-package bubbletea
+package ui
 
 import (
 	"context"
@@ -40,9 +40,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// === AI Streaming Messages ===
 	case streamChunkMsg:
+		wasAtBottom := m.viewport.AtBottom()
 		m.appendToLastMessage(string(msg))
 		m.tokenCount = m.client.GetTokenCount()
-		
+		m.refreshViewportContent(m.formatMessage)
+		if wasAtBottom {
+			m.viewport.GotoBottom()
+		}
+
 		// Continue listening for more chunks if channels are still active
 		if m.streamTextChan != nil && m.streamErrChan != nil {
 			return m, listenForNextStreamMsg(m.streamTextChan, m.streamErrChan, m.streamCtx)
@@ -54,6 +59,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamTextChan = nil
 		m.streamErrChan = nil
 		m.systemMessage = "✓ Response complete"
+		m.refreshViewportContent(m.formatMessage)
+		m.viewport.GotoBottom()
 		return m, tea.Batch(
 			saveConversationCmd(m.client),
 		)
@@ -64,13 +71,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamErrChan = nil
 		m.err = msg.err
 		m.systemMessage = fmt.Sprintf("✗ Error: %v", msg.err)
-		
+
 		// Add error message to chat
 		m.appendMessage(client.Message{
 			Role:      "error",
 			Content:   msg.err.Error(),
 			Timestamp: time.Now(),
 		})
+		m.refreshViewportContent(m.formatMessage)
+		m.viewport.GotoBottom()
 		return m, nil
 
 	case interruptStreamMsg:
@@ -102,6 +111,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Content:   fmt.Sprintf("Switched to %s phase", msg.phaseName),
 			Timestamp: time.Now(),
 		})
+		m.refreshViewportContent(m.formatMessage)
+		m.viewport.GotoBottom()
 		return m, nil
 
 	case phaseTransitionErrorMsg:
@@ -116,7 +127,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messages = conv.Messages
 			m.tokenCount = m.client.GetTokenCount()
 			m.systemMessage = fmt.Sprintf("Loaded previous conversation (%d messages)", msg.messageCount)
-			m.shouldAutoScroll = true // Scroll to bottom after loading
+			m.refreshViewportContent(m.formatMessage)
+			m.viewport.GotoBottom()
 		}
 		return m, nil
 
@@ -223,8 +235,10 @@ func (m Model) handleSendMessage(message string) (tea.Model, tea.Cmd) {
 		Timestamp: time.Now(),
 	})
 
-	// Start streaming message
+	// Start streaming message placeholder
 	m.startStreamingMessage()
+	m.refreshViewportContent(m.formatMessage)
+	m.viewport.GotoBottom()
 
 	// Create cancellable context for streaming
 	m.streamCtx, m.streamCancel = context.WithCancel(m.ctx)
@@ -361,19 +375,10 @@ func (m Model) retryLastMessage() (tea.Model, tea.Cmd) {
 func (m Model) updateComponents(msg tea.Msg, cmds []tea.Cmd) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	// Save scroll state BEFORE updating viewport
-	wasAtBottom := m.viewport.AtBottom()
-
 	// Update viewport
 	m.viewport, cmd = m.viewport.Update(msg)
 	if cmd != nil {
 		cmds = append(cmds, cmd)
-	}
-
-	// Auto-scroll to bottom if new content arrived AND user was at bottom
-	if m.shouldAutoScroll && wasAtBottom {
-		m.viewport.GotoBottom()
-		m.shouldAutoScroll = false
 	}
 
 	// Update textarea (only if not processing)

@@ -1,4 +1,4 @@
-package bubbletea
+package ui
 
 import (
 	"fmt"
@@ -54,17 +54,6 @@ func (m Model) renderSystemMessage() string {
 
 // renderChatViewport renders the scrollable chat message area with scrollbar
 func (m Model) renderChatViewport() string {
-	// Format all messages
-	var content strings.Builder
-	for i, msg := range m.messages {
-		if i > 0 {
-			content.WriteString("\n\n")
-		}
-		content.WriteString(m.formatMessage(msg, i == len(m.messages)-1))
-	}
-
-	m.viewport.SetContent(content.String())
-	
 	// Get viewport content
 	viewportContent := m.viewport.View()
 	
