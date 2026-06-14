@@ -25,6 +25,7 @@ type OpenAIClient struct {
 	phasePrompt              string   // Current phase-specific prompt
 	currentPhaseAllowedTools []string // Tools allowed in current phase
 	compacted                bool     // Set when automatic compaction fired this turn
+	lastPromptTokens         int      // Exact prompt token count from last API response
 }
 
 // NewOpenAIClient creates a new OpenAI client
@@ -154,10 +155,11 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 
 		// Create streaming request
 		req := openai.ChatCompletionRequest{
-			Model:       c.config.Model,
-			Messages:    messages,
-			Temperature: c.config.Temperature,
-			Stream:      true,
+			Model:         c.config.Model,
+			Messages:      messages,
+			Temperature:   c.config.Temperature,
+			Stream:        true,
+			StreamOptions: &openai.StreamOptions{IncludeUsage: true},
 		}
 		req.MaxTokens = c.config.MaxTokens
 
@@ -215,6 +217,10 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 				stream.Close()
 				errChan <- fmt.Errorf("receive stream: %w", err)
 				return
+			}
+
+			if response.Usage != nil && response.Usage.PromptTokens > 0 {
+				c.lastPromptTokens = response.Usage.PromptTokens
 			}
 
 			if len(response.Choices) > 0 {
@@ -386,6 +392,7 @@ func (c *OpenAIClient) LoadConversation(conv *Conversation) {
 // ClearConversation starts a new conversation
 func (c *OpenAIClient) ClearConversation() {
 	c.conversation = NewConversation(c.config.Model)
+	c.lastPromptTokens = 0
 }
 
 // RemoveLastUserMessage removes the last user message from conversation
@@ -393,9 +400,13 @@ func (c *OpenAIClient) RemoveLastUserMessage() {
 	c.conversation.RemoveLastUserMessage()
 }
 
-// GetTokenCount estimates the number of tokens used
+// GetTokenCount returns the prompt token count from the last API response,
+// or falls back to a character-based estimate if no response has been received yet.
 func (c *OpenAIClient) GetTokenCount() int {
-	// Rough estimate: ~4 characters per token
+	if c.lastPromptTokens > 0 {
+		return c.lastPromptTokens
+	}
+	// Fallback estimate: ~4 characters per token
 	total := 0
 	for _, msg := range c.conversation.Messages {
 		total += len(msg.Content) / 4

@@ -73,19 +73,22 @@ func (m Model) renderChatViewport() string {
 func (m Model) renderSidebar() string {
 	w := SidebarWidth
 
-	label := func(s string) string { return sidebarLabelStyle.Render(s) }
-	value := func(s string) string {
-		if len(s) > w {
-			s = s[:w-1] + "…"
+	row := func(l, v string) string {
+		maxV := w - len(l) - 1
+		if maxV < 1 {
+			maxV = 1
 		}
-		return sidebarValueStyle.Render(s)
+		if len(v) > maxV {
+			v = v[:maxV-1] + "…"
+		}
+		return sidebarLabelStyle.Render(l+" ") + sidebarValueStyle.Render(v)
 	}
 	section := func(s string) string { return sidebarSectionStyle.Render(s) }
 
-	ctxInfo := "not set"
+	ctxInfo := fmt.Sprintf("%d (no limit)", m.tokenCount)
 	if m.config.ContextSize > 0 {
 		used := float64(m.tokenCount) / float64(m.config.ContextSize) * 100
-		ctxInfo = fmt.Sprintf("%d / %d (%.0f%%)", m.tokenCount, m.config.ContextSize, used)
+		ctxInfo = fmt.Sprintf("%d/%d (%.0f%%)", m.tokenCount, m.config.ContextSize, used)
 	}
 
 	compactionStatus := "disabled"
@@ -96,26 +99,18 @@ func (m Model) renderSidebar() string {
 
 	lines := []string{
 		section("── Model ──"),
-		label("name:"),
-		value(m.config.Model),
-		label("endpoint:"),
-		value(endpointShort(m.config.BaseURL)),
-		label("temp:"),
-		value(fmt.Sprintf("%.2f", m.config.Temperature)),
-		label("max tokens:"),
-		value(fmt.Sprintf("%d", m.config.MaxTokens)),
+		row("name:", m.config.Model),
+		row("endpoint:", endpointShort(m.config.BaseURL)),
+		row("temp:", fmt.Sprintf("%.2f", m.config.Temperature)),
+		row("max tokens:", fmt.Sprintf("%d", m.config.MaxTokens)),
 		"",
 		section("── Context ──"),
-		label("used:"),
-		value(ctxInfo),
-		label("compact:"),
-		value(compactionStatus),
+		row("used:", ctxInfo),
+		row("compact:", compactionStatus),
 		"",
 		section("── Session ──"),
-		label("phase:"),
-		value(m.currentPhase),
-		label("messages:"),
-		value(fmt.Sprintf("%d", len(m.messages))),
+		row("phase:", m.currentPhase),
+		row("messages:", fmt.Sprintf("%d", len(m.messages))),
 	}
 
 	return sidebarStyle.Width(w).Height(m.viewport.Height).Render(strings.Join(lines, "\n"))

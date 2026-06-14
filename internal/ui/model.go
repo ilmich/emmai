@@ -96,7 +96,7 @@ func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, phaseManager *p
 	}
 }
 
-const SidebarWidth = 26 // visible content width of the sidebar panel
+const SidebarWidth = 36 // visible content width of the sidebar panel
 
 // updateComponentSizes updates viewport and textarea sizes based on terminal dimensions
 func (m *Model) updateComponentSizes() {
@@ -166,12 +166,13 @@ func (m *Model) clearMessages() {
 // refreshViewportContent rebuilds the viewport content from current messages.
 // Must be called on the real model (pointer receiver) whenever messages change.
 func (m *Model) refreshViewportContent(formatMessage func(msg client.Message, isLast bool) string) {
+	wrapStyle := lipgloss.NewStyle().Width(m.viewport.Width)
 	var sb strings.Builder
 	for i, msg := range m.messages {
 		if i > 0 {
 			sb.WriteString("\n\n")
 		}
-		sb.WriteString(formatMessage(msg, i == len(m.messages)-1))
+		sb.WriteString(wrapStyle.Render(formatMessage(msg, i == len(m.messages)-1)))
 	}
 	m.viewport.SetContent(sb.String())
 }
