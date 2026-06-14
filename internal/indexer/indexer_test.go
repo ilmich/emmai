@@ -3,7 +3,6 @@ package indexer
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -46,25 +45,6 @@ func TestBuildOnSelf(t *testing.T) {
 	t.Logf("Indexed %d files, %d symbols", len(idx.Files), len(idx.Symbols))
 }
 
-func TestSummaryNonEmpty(t *testing.T) {
-	wd, _ := os.Getwd()
-	repoRoot, _ := filepath.Abs(filepath.Join(wd, "../.."))
-	idx, err := Build(repoRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := Summary(idx)
-	if s == "" {
-		t.Error("expected non-empty summary")
-	}
-	if !strings.HasPrefix(s, "<codebase_index>") {
-		t.Error("summary should start with <codebase_index>")
-	}
-	if !strings.HasSuffix(strings.TrimRight(s, "\n"), "</codebase_index>") {
-		t.Error("summary should end with </codebase_index>")
-	}
-	t.Log(s)
-}
 
 func TestCtagsParserGo(t *testing.T) {
 	// Go files should be handled by go_parser, not ctags

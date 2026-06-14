@@ -43,6 +43,10 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	editTool := file.NewEditFileTool()
 	aiClient.RegisterTool(editTool)
 
+	// Register delete_file tool
+	deleteTool := file.NewDeleteFileTool()
+	aiClient.RegisterTool(deleteTool)
+
 	// Register run_command tool
 	commandTool := execution.NewRunCommandTool()
 	aiClient.RegisterTool(commandTool)
@@ -69,12 +73,16 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	globExecutor := file.NewGlobExecutor(wd)
 	executor.RegisterHandler("glob_files", globExecutor.HandleGlobFiles)
 
+	// Register delete_file handler
+	deleteExecutor := file.NewDeleteExecutor(wd)
+	executor.RegisterHandler("delete_file", deleteExecutor.HandleDeleteFile)
+
 	// Register edit_file handler — wrapped to rebuild index after each successful edit
 	editExecutor := file.NewEditExecutor(wd)
 	executor.RegisterHandler("edit_file", func(args map[string]interface{}) (string, error) {
 		result, err := editExecutor.HandleEditFile(args)
 		if err == nil {
-			go rebuildIndex(wd, idxRef, aiClient)
+			go rebuildIndex(wd, idxRef)
 		}
 		return result, err
 	})
@@ -89,11 +97,6 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 
 	// Set executor on client
 	aiClient.SetToolExecutor(executor)
-
-	// Inject index summary as user message
-	if summary := indexer.Summary(idxRef.Get()); summary != "" {
-		aiClient.SetIndexSummary(summary)
-	}
 
 	// Initialize phase
 	initializePhase(phaseManager, aiClient)
@@ -120,13 +123,12 @@ func initializePhase(phaseManager *phase.Manager, aiClient *client.OpenAIClient)
 	aiClient.SetPhaseAllowedTools(allowedTools)
 }
 
-// rebuildIndex rebuilds the codebase index in the background, updates the ref, and refreshes the client summary.
-func rebuildIndex(wd string, idxRef *indexer.IndexRef, aiClient *client.OpenAIClient) {
+// rebuildIndex rebuilds the codebase index in the background and updates the ref.
+func rebuildIndex(wd string, idxRef *indexer.IndexRef) {
 	newIdx, err := indexer.Build(wd)
 	if err != nil {
 		return
 	}
 	idxRef.Set(newIdx)
 	_ = indexer.Save(newIdx)
-	aiClient.SetIndexSummary(indexer.Summary(newIdx))
 }
