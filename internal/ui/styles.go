@@ -96,6 +96,22 @@ var (
 	scrollbarThumbStyle = lipgloss.NewStyle().
 		Foreground(colorCyan).
 		Bold(true)
+
+	// Sidebar styles
+	sidebarStyle = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(colorBlue).
+		Padding(0, 1)
+
+	sidebarLabelStyle = lipgloss.NewStyle().
+		Foreground(colorGray)
+
+	sidebarValueStyle = lipgloss.NewStyle().
+		Foreground(colorWhite)
+
+	sidebarSectionStyle = lipgloss.NewStyle().
+		Foreground(colorDarkCyan).
+		Bold(true)
 )
 
 // GetBanner returns the ASCII art banner with version

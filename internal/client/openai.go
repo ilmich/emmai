@@ -24,6 +24,7 @@ type OpenAIClient struct {
 	toolChoice               ToolChoice
 	phasePrompt              string   // Current phase-specific prompt
 	currentPhaseAllowedTools []string // Tools allowed in current phase
+	compacted                bool     // Set when automatic compaction fired this turn
 }
 
 // NewOpenAIClient creates a new OpenAI client
@@ -112,13 +113,23 @@ func (c *OpenAIClient) summarizeConversation(ctx context.Context) error {
 			break
 		}
 	}
+	// Start a fresh conversation for the new session
+	c.conversation = NewConversation(c.config.Model)
 	c.conversation.Messages = []Message{
 		{Role: "system", Content: "Conversation summary:\n" + summary, Timestamp: time.Now()},
 	}
 	if lastUser != nil {
 		c.conversation.Messages = append(c.conversation.Messages, *lastUser)
 	}
+	c.compacted = true
 	return nil
+}
+
+// TakeCompacted returns true if automatic compaction fired since the last call, then resets the flag.
+func (c *OpenAIClient) TakeCompacted() bool {
+	v := c.compacted
+	c.compacted = false
+	return v
 }
 
 // processWithTools handles the tool calling loop

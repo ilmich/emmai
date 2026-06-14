@@ -42,24 +42,22 @@ func resetPhaseCmd(controller *phase.Controller) tea.Cmd {
 	}
 }
 
-// saveConversationCmd saves conversation to disk
-func saveConversationCmd(client *client.OpenAIClient) tea.Cmd {
+// saveConversationCmd saves conversation to the project's .emmai/conversations/ dir.
+func saveConversationCmd(client *client.OpenAIClient, workDir string) tea.Cmd {
 	return func() tea.Msg {
 		conv := client.GetConversation()
-		if err := storage.SaveConversation(conv); err != nil {
-			// Silent failure - don't interrupt user experience
+		if err := storage.SaveConversation(conv, workDir); err != nil {
 			return nil
 		}
 		return conversationSavedMsg{}
 	}
 }
 
-// loadConversationCmd loads the most recent conversation from disk
-func loadConversationCmd() tea.Cmd {
+// loadConversationCmd loads the most recent conversation from the project dir.
+func loadConversationCmd(workDir string) tea.Cmd {
 	return func() tea.Msg {
-		conv, err := storage.LoadMostRecent()
+		conv, err := storage.LoadMostRecent(workDir)
 		if err != nil || conv == nil {
-			// No conversation found
 			return conversationLoadedMsg{messageCount: 0}
 		}
 		return conversationLoadedMsg{messageCount: len(conv.Messages)}

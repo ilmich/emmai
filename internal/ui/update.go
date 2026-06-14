@@ -62,11 +62,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamTextChan = nil
 		m.streamErrChan = nil
 		m.streamCancel = nil
+		if m.client.TakeCompacted() {
+			m.clearMessages()
+			m.tokenCount = m.client.GetTokenCount()
+			m.systemMessage = "✓ Context compacted — new session started"
+			m.refreshViewportContent(m.formatMessage)
+			m.viewport.GotoBottom()
+			return m, saveConversationCmd(m.client, m.workDir)
+		}
+		m.tokenCount = m.client.GetTokenCount()
 		m.systemMessage = "✓ Response complete"
 		m.refreshViewportContent(m.formatMessage)
 		m.viewport.GotoBottom()
 		return m, tea.Batch(
-			saveConversationCmd(m.client),
+			saveConversationCmd(m.client, m.workDir),
 		)
 
 	case streamErrorMsg:

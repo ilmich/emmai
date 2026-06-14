@@ -56,23 +56,77 @@ func (m Model) renderSystemMessage() string {
 	return systemMessageStyle.Width(m.width - 4).Render(m.systemMessage)
 }
 
-// renderChatViewport renders the scrollable chat message area with scrollbar
+// renderChatViewport renders the scrollable chat area + scrollbar + sidebar side by side.
 func (m Model) renderChatViewport() string {
-	// Get viewport content
 	viewportContent := m.viewport.View()
-	
-	// Create scrollbar
 	scrollbar := m.renderScrollbar(m.viewport.Height)
-	
-	// Combine viewport content with scrollbar using JoinHorizontal
-	combined := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		viewportContent,
-		scrollbar,
-	)
-	
-	// Apply style and render
-	return chatViewportStyle.Width(m.width - 2).Render(combined)
+
+	chatWithBar := lipgloss.JoinHorizontal(lipgloss.Top, viewportContent, scrollbar)
+	chatBox := chatViewportStyle.Width(m.width - 2 - SidebarWidth - 4).Render(chatWithBar)
+
+	sidebar := m.renderSidebar()
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, chatBox, sidebar)
+}
+
+// renderSidebar renders the info panel showing model settings and token usage.
+func (m Model) renderSidebar() string {
+	w := SidebarWidth
+
+	label := func(s string) string { return sidebarLabelStyle.Render(s) }
+	value := func(s string) string {
+		if len(s) > w {
+			s = s[:w-1] + "…"
+		}
+		return sidebarValueStyle.Render(s)
+	}
+	section := func(s string) string { return sidebarSectionStyle.Render(s) }
+
+	ctxInfo := "not set"
+	if m.config.ContextSize > 0 {
+		used := float64(m.tokenCount) / float64(m.config.ContextSize) * 100
+		ctxInfo = fmt.Sprintf("%d / %d (%.0f%%)", m.tokenCount, m.config.ContextSize, used)
+	}
+
+	compactionStatus := "disabled"
+	if m.config.ContextSize > 0 {
+		threshold := int(float64(m.config.ContextSize) * 0.85)
+		compactionStatus = fmt.Sprintf("at %d tok", threshold)
+	}
+
+	lines := []string{
+		section("── Model ──"),
+		label("name:"),
+		value(m.config.Model),
+		label("endpoint:"),
+		value(endpointShort(m.config.BaseURL)),
+		label("temp:"),
+		value(fmt.Sprintf("%.2f", m.config.Temperature)),
+		label("max tokens:"),
+		value(fmt.Sprintf("%d", m.config.MaxTokens)),
+		"",
+		section("── Context ──"),
+		label("used:"),
+		value(ctxInfo),
+		label("compact:"),
+		value(compactionStatus),
+		"",
+		section("── Session ──"),
+		label("phase:"),
+		value(m.currentPhase),
+		label("messages:"),
+		value(fmt.Sprintf("%d", len(m.messages))),
+	}
+
+	return sidebarStyle.Width(w).Height(m.viewport.Height).Render(strings.Join(lines, "\n"))
+}
+
+// endpointShort returns a short representation of a base URL.
+func endpointShort(baseURL string) string {
+	baseURL = strings.TrimPrefix(baseURL, "https://")
+	baseURL = strings.TrimPrefix(baseURL, "http://")
+	baseURL = strings.TrimSuffix(baseURL, "/v1")
+	return baseURL
 }
 
 // formatMessage formats a single message with role coloring

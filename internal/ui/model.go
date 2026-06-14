@@ -43,9 +43,10 @@ type Model struct {
 	streamErrChan  <-chan error     // Active stream error channel
 
 	// UI State
-	width  int  // Terminal width
-	height int  // Terminal height
-	ready  bool // Has received first WindowSizeMsg?
+	width   int    // Terminal width
+	height  int    // Terminal height
+	ready   bool   // Has received first WindowSizeMsg?
+	workDir string // Project working directory (for conversation storage)
 
 	// Scrollbar positioning for mouse interaction
 	scrollbarX      int // X coordinate of scrollbar column in terminal
@@ -54,7 +55,7 @@ type Model struct {
 }
 
 // NewModel creates a new Bubble Tea model
-func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, phaseManager *phase.Manager, phaseController *phase.Controller) Model {
+func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, phaseManager *phase.Manager, phaseController *phase.Controller, workDir string) Model {
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -91,40 +92,40 @@ func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, phaseManager *p
 		systemMessage:   "Welcome to EmmAI",
 		tokenCount:      0,
 		ready:           false,
+		workDir:         workDir,
 	}
 }
+
+const SidebarWidth = 26 // visible content width of the sidebar panel
 
 // updateComponentSizes updates viewport and textarea sizes based on terminal dimensions
 func (m *Model) updateComponentSizes() {
 	const (
-		statusBarHeight       = 1
-		bannerHeight          = 5
-		systemMessageHeight   = 3
-		inputBoxHeight        = 5
-		helpBarHeight         = 1
-		borderPadding         = 4 // 2 for borders + 2 for padding
-		scrollbarWidth        = 1 // Width for scrollbar
+		statusBarHeight     = 1
+		bannerHeight        = 5
+		systemMessageHeight = 3
+		inputBoxHeight      = 5
+		helpBarHeight       = 1
+		borderPadding       = 4 // 2 for borders + 2 for padding
+		scrollbarWidth      = 1
+		sidebarTotal        = SidebarWidth + borderPadding // sidebar content + its own borders/padding
 	)
 
-	// Calculate available space
 	totalFixedHeight := statusBarHeight + bannerHeight + systemMessageHeight + inputBoxHeight + helpBarHeight
 	chatHeight := m.height - totalFixedHeight - borderPadding
 
 	if chatHeight < 5 {
-		chatHeight = 5 // Minimum height
+		chatHeight = 5
 	}
 
-	// Update viewport (subtract scrollbar width from viewport content width)
-	m.viewport.Width = m.width - borderPadding - scrollbarWidth
+	// Viewport occupies width minus scrollbar minus sidebar panel
+	m.viewport.Width = m.width - borderPadding - scrollbarWidth - sidebarTotal
 	m.viewport.Height = chatHeight
 
-	// Calculate scrollbar position for mouse interaction
-	// Scrollbar is on the right edge, inside the border
-	m.scrollbarX = m.width - 2           // -2 for right border (1 char border + 1 char padding)
-	m.scrollbarY = statusBarHeight + bannerHeight + systemMessageHeight + 1 // +1 for top border
+	m.scrollbarX = m.width - sidebarTotal - 2
+	m.scrollbarY = statusBarHeight + bannerHeight + systemMessageHeight + 1
 	m.scrollbarHeight = chatHeight
 
-	// Update textarea
 	m.textarea.SetWidth(m.width - borderPadding)
 }
 

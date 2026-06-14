@@ -12,6 +12,7 @@ import (
 	"github.com/ilmich/emmai/internal/config"
 )
 
+
 const conversationsDir = "conversations"
 
 // ConversationMetadata holds summary information about a conversation
@@ -23,13 +24,15 @@ type ConversationMetadata struct {
 	Updated time.Time `json:"updated"`
 }
 
-// SaveConversation saves a conversation to disk
-func SaveConversation(conv *client.Conversation) error {
-	if err := config.EnsureConfigDir(); err != nil {
-		return fmt.Errorf("ensure config dir: %w", err)
-	}
+// GetConversationsDir returns the conversations directory for the given working directory.
+// Conversations are stored under <workDir>/.emmai/conversations/.
+func GetConversationsDir(workDir string) string {
+	return filepath.Join(workDir, config.ConfigDir, conversationsDir)
+}
 
-	dir := getConversationsDir()
+// SaveConversation saves a conversation to <workDir>/.emmai/conversations/.
+func SaveConversation(conv *client.Conversation, workDir string) error {
+	dir := GetConversationsDir(workDir)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("create conversations dir: %w", err)
 	}
@@ -47,9 +50,9 @@ func SaveConversation(conv *client.Conversation) error {
 	return nil
 }
 
-// LoadConversation loads a conversation from disk
-func LoadConversation(id string) (*client.Conversation, error) {
-	filename := filepath.Join(getConversationsDir(), id+".json")
+// LoadConversation loads a conversation by ID from workDir.
+func LoadConversation(id, workDir string) (*client.Conversation, error) {
+	filename := filepath.Join(GetConversationsDir(workDir), id+".json")
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("read conversation file: %w", err)
@@ -63,28 +66,27 @@ func LoadConversation(id string) (*client.Conversation, error) {
 	return &conv, nil
 }
 
-// LoadMostRecent loads the most recently updated conversation
-func LoadMostRecent() (*client.Conversation, error) {
-	metadatas, err := ListConversations()
+// LoadMostRecent loads the most recently updated conversation from workDir.
+func LoadMostRecent(workDir string) (*client.Conversation, error) {
+	metadatas, err := ListConversations(workDir)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(metadatas) == 0 {
-		return nil, nil // No conversations exist yet
+		return nil, nil
 	}
 
-	// Sort by updated time, most recent first
 	sort.Slice(metadatas, func(i, j int) bool {
 		return metadatas[i].Updated.After(metadatas[j].Updated)
 	})
 
-	return LoadConversation(metadatas[0].ID)
+	return LoadConversation(metadatas[0].ID, workDir)
 }
 
-// ListConversations returns metadata for all saved conversations
-func ListConversations() ([]ConversationMetadata, error) {
-	dir := getConversationsDir()
+// ListConversations returns metadata for all saved conversations in workDir.
+func ListConversations(workDir string) ([]ConversationMetadata, error) {
+	dir := GetConversationsDir(workDir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -99,10 +101,10 @@ func ListConversations() ([]ConversationMetadata, error) {
 			continue
 		}
 
-		id := entry.Name()[:len(entry.Name())-5] // Remove .json extension
-		conv, err := LoadConversation(id)
+		id := entry.Name()[:len(entry.Name())-5]
+		conv, err := LoadConversation(id, workDir)
 		if err != nil {
-			continue // Skip corrupted files
+			continue
 		}
 
 		preview := "New conversation"
@@ -125,18 +127,13 @@ func ListConversations() ([]ConversationMetadata, error) {
 	return metadatas, nil
 }
 
-// DeleteConversation removes a conversation from disk
-func DeleteConversation(id string) error {
-	filename := filepath.Join(getConversationsDir(), id+".json")
+// DeleteConversation removes a conversation from workDir.
+func DeleteConversation(id, workDir string) error {
+	filename := filepath.Join(GetConversationsDir(workDir), id+".json")
 	if err := os.Remove(filename); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete conversation file: %w", err)
 	}
 	return nil
-}
-
-// getConversationsDir returns the full path to conversations directory
-func getConversationsDir() string {
-	return filepath.Join(config.GetConfigDir(), conversationsDir)
 }
 
 // truncate shortens a string to the specified length

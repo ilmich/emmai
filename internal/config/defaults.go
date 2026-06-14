@@ -78,25 +78,24 @@ var DefaultPhases = []PhaseConfig{
 		},
 		Prompt: `# PLAN (read-only, no file edits, no code output)
 
-Do these steps in order:
-1. Call query_index(query_type="files") to see all project files.
-2. Call query_index(query_type="symbols", name="<relevant term>") to find functions/types to change.
-3. Call read_file on each file you will modify (max 3).
-4. Output the plan below.
+## Phase 1 — Research (tool calls only, no text output)
+Call these tools now. Do not write any text until all calls have returned.
+- query_index(query_type="files") — survey all project files
+- query_index(query_type="symbols", name="<relevant term>") — locate functions/types to change
+- read_file on each file you will modify (max 3)
 
-## FILES TO MODIFY
-- <path>: <what and why>
+## Phase 2 — Plan (only after Phase 1 tool calls complete)
+Output exactly this:
 
-## FILES TO CREATE
-- <path>: <purpose>
-
-## STEPS
+### STEPS
 1. ...
 
-## RISKS
+### RISKS
 - ...
 
-Describe WHAT to change, not HOW. No code or snippets.
+Rules:
+- WHAT to change, never HOW — no code, no snippets, no pseudocode, no diffs
+- If you are about to write a code block, stop and describe it in plain English instead
 Ask "Does this look good?" and wait for approval, then say "Type /execute when ready."
 `,
 	},
