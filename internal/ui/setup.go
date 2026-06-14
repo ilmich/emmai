@@ -5,9 +5,11 @@ import (
 
 	"github.com/ilmich/emmai/internal/client"
 	"github.com/ilmich/emmai/internal/config"
+	"github.com/ilmich/emmai/internal/indexer"
 	"github.com/ilmich/emmai/internal/phase"
 	"github.com/ilmich/emmai/internal/tools/execution"
 	"github.com/ilmich/emmai/internal/tools/file"
+	toolindex "github.com/ilmich/emmai/internal/tools/index"
 )
 
 // SetupModel initializes a new Model with all tools and phase configuration
@@ -17,6 +19,10 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	if err != nil {
 		wd = "."
 	}
+
+	// Build or load codebase index (best-effort; ref holds nil if it fails)
+	idx, _ := indexer.BuildOrLoad(wd)
+	idxRef := indexer.NewIndexRef(idx)
 
 	// Create phase manager
 	phaseManager := phase.NewManager(cfg.Phases, cfg.InitialPhase)
@@ -41,8 +47,15 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	commandTool := execution.NewRunCommandTool()
 	aiClient.RegisterTool(commandTool)
 
-	// Create phase controller for manual transitions (slash commands)
+	// Register query_index tool
+	queryTool := toolindex.NewQueryIndexTool()
+	aiClient.RegisterTool(queryTool)
+
+	// Create phase controller and attach summary provider from the live index ref
 	phaseController := phase.NewController(phaseManager, aiClient)
+	phaseController.SetSummaryProvider(func() string {
+		return indexer.Summary(idxRef.Get())
+	})
 
 	// Create tool executor
 	executor := client.NewSimpleToolExecutor()
@@ -59,41 +72,63 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	globExecutor := file.NewGlobExecutor(wd)
 	executor.RegisterHandler("glob_files", globExecutor.HandleGlobFiles)
 
-	// Register edit_file handler
+	// Register edit_file handler — wrapped to rebuild index after each successful edit
 	editExecutor := file.NewEditExecutor(wd)
-	executor.RegisterHandler("edit_file", editExecutor.HandleEditFile)
+	executor.RegisterHandler("edit_file", func(args map[string]interface{}) (string, error) {
+		result, err := editExecutor.HandleEditFile(args)
+		if err == nil {
+			go rebuildIndex(wd, idxRef)
+		}
+		return result, err
+	})
 
 	// Register run_command handler
 	commandExecutor := execution.NewCommandExecutor(wd, &cfg.Security.CommandExecution, phaseManager)
 	executor.RegisterHandler("run_command", commandExecutor.HandleRunCommand)
 
+	// Register query_index handler — backed by the live index ref
+	queryExecutor := toolindex.NewQueryExecutor(idxRef)
+	executor.RegisterHandler("query_index", queryExecutor.HandleQueryIndex)
+
 	// Set executor on client
 	aiClient.SetToolExecutor(executor)
 
-	// Initialize phase
-	initializePhase(phaseManager, aiClient)
+	// Initialize phase (injects prompt + index summary)
+	initializePhase(phaseManager, aiClient, idxRef)
 
 	// Create and return model
 	return NewModel(cfg, aiClient, phaseManager, phaseController)
 }
 
-// initializePhase automatically injects the initial phase prompt
-func initializePhase(phaseManager *phase.Manager, aiClient *client.OpenAIClient) {
+// initializePhase injects the initial phase prompt, prepending the codebase index summary if available.
+func initializePhase(phaseManager *phase.Manager, aiClient *client.OpenAIClient, idxRef *indexer.IndexRef) {
 	initialPhase := phaseManager.GetInitialPhase()
 	if initialPhase == "" {
 		return
 	}
 
-	// Start the initial phase
 	response, err := phaseManager.StartPhase(initialPhase)
 	if err != nil {
 		return
 	}
 
-	// Inject phase prompt into client
-	aiClient.SetPhasePrompt(response.Prompt)
+	prompt := response.Prompt
+	if summary := indexer.Summary(idxRef.Get()); summary != "" {
+		prompt = summary + "\n\n" + prompt
+	}
 
-	// Set allowed tools for initial phase
+	aiClient.SetPhasePrompt(prompt)
+
 	allowedTools := phaseManager.GetCurrentPhaseAllowedTools()
 	aiClient.SetPhaseAllowedTools(allowedTools)
+}
+
+// rebuildIndex rebuilds the codebase index in the background and updates the ref.
+func rebuildIndex(wd string, idxRef *indexer.IndexRef) {
+	newIdx, err := indexer.Build(wd)
+	if err != nil {
+		return
+	}
+	idxRef.Set(newIdx)
+	_ = indexer.Save(newIdx)
 }
