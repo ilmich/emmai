@@ -10,6 +10,7 @@ import (
 	"github.com/ilmich/emmai/internal/tools/execution"
 	"github.com/ilmich/emmai/internal/tools/file"
 	toolindex "github.com/ilmich/emmai/internal/tools/index"
+	"github.com/ilmich/emmai/internal/tools/web"
 )
 
 // SetupModel initializes a new Model with all tools and phase configuration
@@ -46,6 +47,10 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	// Register delete_file tool
 	deleteTool := file.NewDeleteFileTool()
 	aiClient.RegisterTool(deleteTool)
+
+	// Register fetch_url tool
+	fetchTool := web.NewFetchURLTool()
+	aiClient.RegisterTool(fetchTool)
 
 	// Register run_command tool
 	commandTool := execution.NewRunCommandTool()
@@ -86,6 +91,10 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 		}
 		return result, err
 	})
+
+	// Register fetch_url handler
+	fetchExecutor := web.NewFetchExecutor()
+	executor.RegisterHandler("fetch_url", fetchExecutor.HandleFetchURL)
 
 	// Register run_command handler
 	commandExecutor := execution.NewCommandExecutor(wd, &cfg.Security.CommandExecution, phaseManager)

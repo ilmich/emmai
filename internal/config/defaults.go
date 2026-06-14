@@ -75,6 +75,7 @@ var DefaultPhases = []PhaseConfig{
 			"search_files",
 			"glob_files",
 			"query_index",
+			"fetch_url",
 		},
 		Prompt: `# PLAN (read-only, no file edits, no code output)
 
@@ -111,6 +112,7 @@ Ask "Does this look good?" and wait for approval, then say "Type /execute when r
 			"glob_files",
 			"run_command", // build, tests allowed
 			"query_index",
+			"fetch_url",
 		},
 		Prompt: `# EXECUTE (follow the approved plan exactly, no deviations)
 
@@ -119,8 +121,9 @@ For each file in the plan:
 To MODIFY a file:
 1. query_index(query_type="symbols", name="<symbol>") — locate exact file/line
 2. read_file — get content and line hashes
-3. edit_file — use hashes from step 2 (never guess; on mismatch re-read and retry)
-4. Report: "✓ Modified <path> — <reason>"
+3. edit_file with preview_only=true — review the diff, confirm it matches intent
+4. edit_file without preview_only — apply (same edits, no changes)
+5. Report: "✓ Modified <path> — <reason>"
 
 To CREATE a file:
 1. edit_file with create_file operation
@@ -140,6 +143,7 @@ If something unexpected blocks progress, stop and ask the user.
 			"glob_files",
 			"run_command", // tests, linters, builds allowed
 			"query_index",
+			"fetch_url",
 		},
 		Prompt: `# VERIFY (read-only, no file edits)
 

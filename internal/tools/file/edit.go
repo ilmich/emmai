@@ -50,6 +50,8 @@ type EditDetail struct {
 type EditResponse struct {
 	Success        bool         `json:"success"`
 	FilePath       string       `json:"file_path"`
+	PreviewOnly    bool         `json:"preview_only,omitempty"`
+	Diff           string       `json:"diff,omitempty"`
 	EditsApplied   int          `json:"edits_applied"`
 	EditsFailed    int          `json:"edits_failed"`
 	FileSizeBefore int64        `json:"file_size_before"`
@@ -75,7 +77,7 @@ func NewEditExecutor(workingDir string) *EditExecutor {
 func NewEditFileTool() client.Tool {
 	return client.NewFunctionTool(
 		"edit_file",
-		"Edit a file using hash-based line addressing. Hashes come from read_file. Operations: replace_lines, insert_after_hash, insert_before_hash, delete_by_hash, create_file.",
+		"Edit a file using hash-based line addressing. Hashes come from read_file. Operations: replace_lines, insert_after_hash, insert_before_hash, delete_by_hash, create_file. Set preview_only=true to see a unified diff without writing the file.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -121,6 +123,10 @@ func NewEditFileTool() client.Tool {
 						"required": []string{"type"},
 					},
 				},
+				"preview_only": map[string]interface{}{
+					"type":        "boolean",
+					"description": "If true, compute and return a unified diff but do not write to disk. Use to verify changes before applying.",
+				},
 			},
 			"required": []string{"file_path", "edits"},
 		},
@@ -134,6 +140,8 @@ func (e *EditExecutor) HandleEditFile(args map[string]interface{}) (string, erro
 	if !ok || filePath == "" {
 		return e.errorResponse("", "file_path is required", "Provide valid file path")
 	}
+
+	previewOnly, _ := args["preview_only"].(bool)
 
 	// Clean and validate path
 	filePath = filepath.Clean(filePath)
@@ -248,7 +256,26 @@ func (e *EditExecutor) HandleEditFile(args map[string]interface{}) (string, erro
 		details = append(details, detail)
 	}
 
-	// All validations passed - write the modified content
+	// Compute diff before writing
+	diff := unifiedDiff(originalContent, testContent, relPath)
+
+	if previewOnly {
+		response := EditResponse{
+			Success:        true,
+			FilePath:       relPath,
+			PreviewOnly:    true,
+			Diff:           diff,
+			EditsApplied:   len(edits),
+			EditsFailed:    0,
+			FileSizeBefore: sizeBefore,
+			Details:        details,
+			Hint:           "Preview only — no changes written. Call again without preview_only=true to apply.",
+		}
+		jsonResponse, _ := json.Marshal(response)
+		return string(jsonResponse), nil
+	}
+
+	// Write the modified content
 	if err := os.WriteFile(absPath, []byte(testContent), info.Mode()); err != nil {
 		return e.errorResponse(filePath, "failed to write file", "Check permissions")
 	}
@@ -261,6 +288,7 @@ func (e *EditExecutor) HandleEditFile(args map[string]interface{}) (string, erro
 	response := EditResponse{
 		Success:        true,
 		FilePath:       relPath,
+		Diff:           diff,
 		EditsApplied:   len(edits),
 		EditsFailed:    0,
 		FileSizeBefore: sizeBefore,
