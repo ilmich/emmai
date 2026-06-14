@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -123,11 +124,6 @@ func Load() (*Config, error) {
 	// Normalize base URL (auto-append /v1 if missing)
 	cfg.BaseURL = normalizeBaseURL(cfg.BaseURL)
 
-	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
 	return cfg, nil
 }
 
@@ -157,6 +153,16 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// ProfileNames returns the sorted list of configured model profile names.
+func (c *Config) ProfileNames() []string {
+	names := make([]string, 0, len(c.Models))
+	for k := range c.Models {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // ApplyProfile overlays a named model profile's non-zero fields onto the config.
