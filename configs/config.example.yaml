@@ -434,3 +434,31 @@ security:
 # Discord: https://discord.gg/uJAeKSAGDy
 #
 # ============================================================================
+
+# ----------------------------------------------------------------------------
+# Model Profiles
+# ----------------------------------------------------------------------------
+# Named profiles selectable via --model flag: emmai --model <name>
+# Each profile overrides only the fields it specifies; others inherit global config.
+#
+# Example usage:
+#   emmai --model gpt4o
+#   emmai --model local-qwen
+#   emmai --model deepseek-r1
+#
+# models:
+#   gpt4o:
+#     model: gpt-4o
+#     base_url: https://api.openai.com/v1
+#     api_key: sk-...
+#     max_tokens: 8192
+#
+#   local-qwen:
+#     model: qwen2.5-coder:7b
+#     base_url: http://localhost:11434
+#     max_tokens: 16384
+#
+#   deepseek-r1:
+#     model: deepseek-r1
+#     base_url: http://localhost:11434
+#     max_tokens: 8192

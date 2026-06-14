@@ -93,9 +93,9 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 			Model:       c.config.Model,
 			Messages:    messages,
 			Temperature: c.config.Temperature,
-			MaxTokens:   c.config.MaxTokens,
 			Stream:      true,
 		}
+		req.MaxTokens = c.config.MaxTokens
 
 		// Add tools if any are registered
 		if c.toolRegistry.HasTools() {

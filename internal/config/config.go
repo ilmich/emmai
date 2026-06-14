@@ -48,18 +48,28 @@ type AllowedCommand struct {
 	AllowedPhases []string `yaml:"allowed_phases,omitempty"`
 }
 
+// ModelProfile holds per-model overrides selectable via --model flag
+type ModelProfile struct {
+	Model       string  `yaml:"model,omitempty"`
+	BaseURL     string  `yaml:"base_url,omitempty"`
+	APIKey      string  `yaml:"api_key,omitempty"`
+	MaxTokens   int     `yaml:"max_tokens,omitempty"`
+	Temperature float32 `yaml:"temperature,omitempty"`
+}
+
 // Config holds the application configuration
 type Config struct {
-	APIKey             string        `yaml:"api_key"`
-	BaseURL            string        `yaml:"base_url"`
-	InsecureSkipVerify bool          `yaml:"insecure_skip_verify"`
-	Model              string        `yaml:"model"`
-	Temperature        float32       `yaml:"temperature"`
-	MaxTokens          int           `yaml:"max_tokens"`
-	SystemPrompt       string        `yaml:"system_prompt"`
-	Phases             []PhaseConfig `yaml:"phases,omitempty"`
-	InitialPhase       string        `yaml:"initial_phase,omitempty"`
-	Security           SecurityPolicy `yaml:"security,omitempty"`
+	APIKey             string                    `yaml:"api_key"`
+	BaseURL            string                    `yaml:"base_url"`
+	InsecureSkipVerify bool                      `yaml:"insecure_skip_verify"`
+	Model              string                    `yaml:"model"`
+	Temperature        float32                   `yaml:"temperature"`
+	MaxTokens          int                       `yaml:"max_tokens"`
+	SystemPrompt       string                    `yaml:"system_prompt"`
+	Phases             []PhaseConfig             `yaml:"phases,omitempty"`
+	InitialPhase       string                    `yaml:"initial_phase,omitempty"`
+	Security           SecurityPolicy            `yaml:"security,omitempty"`
+	Models             map[string]ModelProfile   `yaml:"models,omitempty"`
 }
 
 // Load reads configuration from file and environment variables
@@ -147,6 +157,25 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// ApplyProfile overlays a named model profile's non-zero fields onto the config.
+func (c *Config) ApplyProfile(name string) error {
+	p, ok := c.Models[name]
+	if !ok {
+		return fmt.Errorf("model profile %q not found in config", name)
+	}
+	if p.Model != ""         { c.Model = p.Model }
+	if p.BaseURL != ""       { c.BaseURL = p.BaseURL }
+	if p.APIKey != ""        { c.APIKey = p.APIKey }
+	if p.MaxTokens > 0   { c.MaxTokens = p.MaxTokens }
+	if p.Temperature > 0 { c.Temperature = p.Temperature }
+	return nil
+}
+
+// NormalizeBaseURL ensures the base URL ends with /v1.
+func NormalizeBaseURL(baseURL string) string {
+	return normalizeBaseURL(baseURL)
 }
 
 // normalizeBaseURL ensures the base URL ends with /v1
