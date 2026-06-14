@@ -24,13 +24,6 @@ func (m *mockClient) SetPhaseAllowedTools(tools []string) {
 func createTestPhaseManager() *Manager {
 	phases := []config.PhaseConfig{
 		{
-			Name:         "explore",
-			Prompt:       "Explore phase prompt",
-			NextPhase:    "plan",
-			ReadOnly:     true,
-			AllowedTools: []string{"search_files"},
-		},
-		{
 			Name:         "plan",
 			Prompt:       "Plan phase prompt",
 			NextPhase:    "execute",
@@ -53,7 +46,7 @@ func createTestPhaseManager() *Manager {
 		},
 	}
 
-	return NewManager(phases, "explore")
+	return NewManager(phases, "plan")
 }
 
 func TestController_TransitionToPhase_Success(t *testing.T) {
@@ -133,17 +126,17 @@ func TestController_ResetToInitial(t *testing.T) {
 		t.Fatalf("Failed to reset phase: %v", err)
 	}
 
-	// Verify we're back in explore phase
-	if controller.GetCurrentPhase() != "explore" {
-		t.Errorf("Expected current phase to be explore after reset, got %s", controller.GetCurrentPhase())
+	// Verify we're back in plan phase
+	if controller.GetCurrentPhase() != "plan" {
+		t.Errorf("Expected current phase to be plan after reset, got %s", controller.GetCurrentPhase())
 	}
 
-	if resp.Phase != "explore" {
-		t.Errorf("Expected response phase to be explore, got %s", resp.Phase)
+	if resp.Phase != "plan" {
+		t.Errorf("Expected response phase to be plan, got %s", resp.Phase)
 	}
 
 	// Verify client state was updated
-	if mockCli.phasePrompt != "Explore phase prompt" {
+	if mockCli.phasePrompt != "Plan phase prompt" {
 		t.Errorf("Expected prompt to be reset, got: %s", mockCli.phasePrompt)
 	}
 }
@@ -153,8 +146,8 @@ func TestController_PhaseTransitionFlow(t *testing.T) {
 	mockCli := &mockClient{}
 	controller := NewController(manager, mockCli)
 
-	// Test full phase flow: explore -> plan -> execute -> verify
-	phases := []string{"explore", "plan", "execute", "verify"}
+	// Test full phase flow: plan -> execute -> verify
+	phases := []string{"plan", "execute", "verify"}
 	
 	for _, phaseName := range phases {
 		response, err := controller.TransitionToPhase(phaseName)

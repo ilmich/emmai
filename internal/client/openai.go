@@ -376,6 +376,15 @@ func (c *OpenAIClient) GetPhasePrompt() string {
 	return c.phasePrompt
 }
 
+// SetIndexSummary appends the codebase index summary as a user message in the conversation.
+// Called at startup and again whenever the index is rebuilt after file edits.
+func (c *OpenAIClient) SetIndexSummary(summary string) {
+	if summary == "" {
+		return
+	}
+	c.conversation.AddMessage("user", summary)
+}
+
 // SetPhaseAllowedTools updates the allowed tools for the current phase
 func (c *OpenAIClient) SetPhaseAllowedTools(allowedTools []string) {
 	c.currentPhaseAllowedTools = allowedTools

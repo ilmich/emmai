@@ -51,11 +51,8 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	queryTool := toolindex.NewQueryIndexTool()
 	aiClient.RegisterTool(queryTool)
 
-	// Create phase controller and attach summary provider from the live index ref
+	// Create phase controller
 	phaseController := phase.NewController(phaseManager, aiClient)
-	phaseController.SetSummaryProvider(func() string {
-		return indexer.Summary(idxRef.Get())
-	})
 
 	// Create tool executor
 	executor := client.NewSimpleToolExecutor()
@@ -77,7 +74,7 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	executor.RegisterHandler("edit_file", func(args map[string]interface{}) (string, error) {
 		result, err := editExecutor.HandleEditFile(args)
 		if err == nil {
-			go rebuildIndex(wd, idxRef)
+			go rebuildIndex(wd, idxRef, aiClient)
 		}
 		return result, err
 	})
@@ -93,15 +90,20 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	// Set executor on client
 	aiClient.SetToolExecutor(executor)
 
-	// Initialize phase (injects prompt + index summary)
-	initializePhase(phaseManager, aiClient, idxRef)
+	// Inject index summary as user message
+	if summary := indexer.Summary(idxRef.Get()); summary != "" {
+		aiClient.SetIndexSummary(summary)
+	}
+
+	// Initialize phase
+	initializePhase(phaseManager, aiClient)
 
 	// Create and return model
 	return NewModel(cfg, aiClient, phaseManager, phaseController)
 }
 
-// initializePhase injects the initial phase prompt, prepending the codebase index summary if available.
-func initializePhase(phaseManager *phase.Manager, aiClient *client.OpenAIClient, idxRef *indexer.IndexRef) {
+// initializePhase injects the initial phase prompt and allowed tools.
+func initializePhase(phaseManager *phase.Manager, aiClient *client.OpenAIClient) {
 	initialPhase := phaseManager.GetInitialPhase()
 	if initialPhase == "" {
 		return
@@ -112,23 +114,19 @@ func initializePhase(phaseManager *phase.Manager, aiClient *client.OpenAIClient,
 		return
 	}
 
-	prompt := response.Prompt
-	if summary := indexer.Summary(idxRef.Get()); summary != "" {
-		prompt = summary + "\n\n" + prompt
-	}
-
-	aiClient.SetPhasePrompt(prompt)
+	aiClient.SetPhasePrompt(response.Prompt)
 
 	allowedTools := phaseManager.GetCurrentPhaseAllowedTools()
 	aiClient.SetPhaseAllowedTools(allowedTools)
 }
 
-// rebuildIndex rebuilds the codebase index in the background and updates the ref.
-func rebuildIndex(wd string, idxRef *indexer.IndexRef) {
+// rebuildIndex rebuilds the codebase index in the background, updates the ref, and refreshes the client summary.
+func rebuildIndex(wd string, idxRef *indexer.IndexRef, aiClient *client.OpenAIClient) {
 	newIdx, err := indexer.Build(wd)
 	if err != nil {
 		return
 	}
 	idxRef.Set(newIdx)
 	_ = indexer.Save(newIdx)
+	aiClient.SetIndexSummary(indexer.Summary(newIdx))
 }

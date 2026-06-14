@@ -6,9 +6,7 @@ import (
 	"strings"
 )
 
-const maxSymbolsPerKind = 20
-
-// Summary returns a compact string (< ~1500 chars) suitable for prompt injection.
+// Summary returns a compact string suitable for prompt injection.
 func Summary(idx *Index) string {
 	if idx == nil || len(idx.Files) == 0 {
 		return ""
@@ -36,27 +34,6 @@ func Summary(idx *Index) string {
 	if pkgs > 0 {
 		sb.WriteString("### Packages\n")
 		sb.WriteString(formatPackages(idx.Files) + "\n\n")
-	}
-
-	// Symbols by kind
-	byKind := groupByKind(idx.Symbols)
-	if len(byKind) > 0 {
-		sb.WriteString("### Symbols\n")
-		// Stable order
-		order := []string{"func", "method", "struct", "type", "interface", "const", "var"}
-		for _, kind := range order {
-			syms, ok := byKind[kind]
-			if !ok {
-				continue
-			}
-			names := symbolNames(syms, maxSymbolsPerKind)
-			extra := len(syms) - maxSymbolsPerKind
-			line := fmt.Sprintf("%s (%d): %s", kind, len(syms), strings.Join(names, ", "))
-			if extra > 0 {
-				line += fmt.Sprintf(" … %d more", extra)
-			}
-			sb.WriteString(line + "\n")
-		}
 	}
 
 	sb.WriteString("</codebase_index>\n")
@@ -148,22 +125,3 @@ func formatPackages(files []FileEntry) string {
 	return strings.Join(parts, " · ")
 }
 
-func groupByKind(syms []Symbol) map[string][]Symbol {
-	m := make(map[string][]Symbol)
-	for _, s := range syms {
-		m[s.Kind] = append(m[s.Kind], s)
-	}
-	return m
-}
-
-func symbolNames(syms []Symbol, max int) []string {
-	n := len(syms)
-	if n > max {
-		n = max
-	}
-	names := make([]string, n)
-	for i := 0; i < n; i++ {
-		names[i] = syms[i].Name
-	}
-	return names
-}

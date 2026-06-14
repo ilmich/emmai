@@ -282,10 +282,6 @@ func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
 		m.systemMessage = "Switching to VERIFY phase..."
 		return m, transitionPhaseCmd(m.phaseController, "verify")
 
-	case "/explore":
-		m.systemMessage = "Switching to EXPLORE phase..."
-		return m, transitionPhaseCmd(m.phaseController, "explore")
-
 	case "/reset":
 		m.systemMessage = "Resetting to initial phase..."
 		return m, resetPhaseCmd(m.phaseController)
@@ -306,7 +302,6 @@ func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
   /plan     - Switch to PLAN phase
   /execute  - Switch to EXECUTE phase
   /verify   - Switch to VERIFY phase
-  /explore  - Switch to EXPLORE phase
   /reset    - Reset to initial phase
   /status   - Show current phase
   /help     - Show this help`
@@ -316,7 +311,7 @@ func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
 			Content:   help,
 			Timestamp: time.Now(),
 		})
-		m.systemMessage = "Available commands: /plan, /execute, /verify, /explore, /reset, /status, /help"
+		m.systemMessage = "Available commands: /plan, /execute, /verify, /reset, /status, /help"
 		return m, nil
 
 	default:

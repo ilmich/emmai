@@ -10,15 +10,10 @@ type PhaseClient interface {
 	SetPhaseAllowedTools(tools []string)
 }
 
-// SummaryProvider returns a codebase summary string to prepend to phase prompts.
-// It returns "" when no index is available.
-type SummaryProvider func() string
-
 // Controller handles phase transitions with AI client integration
 type Controller struct {
-	manager  *Manager
-	client   PhaseClient
-	summary  SummaryProvider // may be nil
+	manager *Manager
+	client  PhaseClient
 }
 
 // NewController creates a new phase controller
@@ -27,11 +22,6 @@ func NewController(manager *Manager, client PhaseClient) *Controller {
 		manager: manager,
 		client:  client,
 	}
-}
-
-// SetSummaryProvider attaches a summary provider that is called on every phase transition.
-func (c *Controller) SetSummaryProvider(fn SummaryProvider) {
-	c.summary = fn
 }
 
 // TransitionToPhase transitions to a specified phase and updates the AI client
@@ -73,13 +63,7 @@ func (c *Controller) GetCurrentPhase() string {
 
 // updateClientContext updates the AI client with phase settings
 func (c *Controller) updateClientContext(phaseResponse *PhaseResponse) {
-	prompt := phaseResponse.Prompt
-	if c.summary != nil {
-		if s := c.summary(); s != "" {
-			prompt = s + "\n\n" + prompt
-		}
-	}
-	c.client.SetPhasePrompt(prompt)
+	c.client.SetPhasePrompt(phaseResponse.Prompt)
 
 	allowedTools := c.manager.GetCurrentPhaseAllowedTools()
 	c.client.SetPhaseAllowedTools(allowedTools)
@@ -87,7 +71,7 @@ func (c *Controller) updateClientContext(phaseResponse *PhaseResponse) {
 
 // validatePhase checks if the phase name is valid
 func (c *Controller) validatePhase(phaseName string) error {
-	validPhases := []string{"explore", "plan", "execute", "verify"}
+	validPhases := []string{"plan", "execute", "verify"}
 
 	for _, valid := range validPhases {
 		if phaseName == valid {
