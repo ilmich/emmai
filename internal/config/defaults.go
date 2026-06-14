@@ -117,6 +117,7 @@ Rules:
 		AllowedTools: []string{
 			"read_file",
 			"edit_file",
+			"delete_file",
 			"search_files",
 			"glob_files",
 			"run_command", // build, tests allowed
