@@ -8,9 +8,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ilmich/emmai/internal/config"
-	"github.com/sashabaranov/go-openai"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 // OpenAIClient wraps the OpenAI API client
@@ -81,8 +82,60 @@ func (c *OpenAIClient) SendMessage(ctx context.Context, userMsg string) (<-chan 
 	return textChan, errChan
 }
 
+// summarizeConversation calls the LLM to produce a summary, then replaces the
+// conversation history with that summary + the last user message.
+func (c *OpenAIClient) summarizeConversation(ctx context.Context) error {
+	messages := c.buildAPIMessages()
+	messages = append(messages, openai.ChatCompletionMessage{
+		Role:    "user",
+		Content: "Summarize the conversation above in a concise paragraph, preserving key decisions, file changes, and context needed to continue the task.",
+	})
+	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model:     c.config.Model,
+		Messages:  messages,
+		MaxTokens: 512,
+	})
+	if err != nil {
+		return err
+	}
+	if len(resp.Choices) == 0 {
+		return fmt.Errorf("no choices in summarization response")
+	}
+	summary := resp.Choices[0].Message.Content
+
+	// Preserve the last user message so the current request retains context.
+	var lastUser *Message
+	for i := len(c.conversation.Messages) - 1; i >= 0; i-- {
+		if c.conversation.Messages[i].Role == "user" {
+			msg := c.conversation.Messages[i]
+			lastUser = &msg
+			break
+		}
+	}
+	c.conversation.Messages = []Message{
+		{Role: "system", Content: "Conversation summary:\n" + summary, Timestamp: time.Now()},
+	}
+	if lastUser != nil {
+		c.conversation.Messages = append(c.conversation.Messages, *lastUser)
+	}
+	return nil
+}
+
 // processWithTools handles the tool calling loop
 func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- string, errChan chan<- error) {
+	// Compact conversation if approaching context limit
+	if c.config.ContextSize > 0 {
+		systemTokens := len(c.config.SystemPrompt)/4 + len(c.phasePrompt)/4
+		msgTokens := 0
+		for _, m := range c.conversation.Messages {
+			msgTokens += len(m.Content)/4 + 1
+		}
+		threshold := int(float64(c.config.ContextSize) * 0.85)
+		if systemTokens+msgTokens >= threshold {
+			_ = c.summarizeConversation(ctx) // best-effort; continue even on failure
+		}
+	}
+
 	maxIterations := 10 // Prevent infinite loops
 	for i := 0; i < maxIterations; i++ {
 		// Build messages for API

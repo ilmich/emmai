@@ -456,9 +456,11 @@ security:
 #   local-qwen:
 #     model: qwen2.5-coder:7b
 #     base_url: http://localhost:11434
-#     max_tokens: 16384
+#     max_tokens: 4096
+#     context_size: 32768   # triggers LLM summarization at ~85% (≈27k tokens)
 #
 #   deepseek-r1:
 #     model: deepseek-r1
 #     base_url: http://localhost:11434
 #     max_tokens: 8192
+#     context_size: 65536

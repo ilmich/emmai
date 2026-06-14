@@ -37,6 +37,10 @@ func (m Model) renderStatusBar() string {
 	status := fmt.Sprintf("Model: %s%s | Tokens: %d | Phase: %s",
 		m.config.Model, customEndpoint, m.tokenCount, m.currentPhase)
 
+	if m.warnMessage != "" {
+		status += " | ⚠ " + m.warnMessage
+	}
+
 	if m.isProcessing {
 		status = m.spinner.View() + " " + status
 	}

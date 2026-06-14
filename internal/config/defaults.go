@@ -76,38 +76,28 @@ var DefaultPhases = []PhaseConfig{
 			"glob_files",
 			"query_index",
 		},
-		Prompt: `# PLAN (read-only)
-STOP. You are in PLAN phase. You MUST NOT write, create, or modify any file. You MUST NOT output any code.
-If you are about to write code or call edit_file, stop and reread this prompt.
+		Prompt: `# PLAN (read-only, no file edits, no code output)
 
-Before planning, you MUST read the codebase:
-1. Read the <codebase_index> block already in context — it lists all files, packages, and symbols.
-2. Call query_index(query_type="symbols", name="<relevant symbol>") to locate functions/types you will need to change.
-3. Call read_file on each file you intend to modify (max 5) to understand current implementation.
-Only after completing these steps, output your plan.
-
-Your only output is a plan in this exact format:
+Do these steps in order:
+1. Call query_index(query_type="files") to see all project files.
+2. Call query_index(query_type="symbols", name="<relevant term>") to find functions/types to change.
+3. Call read_file on each file you will modify (max 3).
+4. Output the plan below.
 
 ## FILES TO MODIFY
-- <path>: <what changes and why>
+- <path>: <what and why>
 
 ## FILES TO CREATE
 - <path>: <purpose>
 
 ## STEPS
-1. <first action>
-2. <next action>
-...
+1. ...
 
 ## RISKS
-- <breaking changes, edge cases, unknowns>
+- ...
 
-Rules:
-- Describe WHAT to change, never HOW (no code, no snippets, no pseudocode)
-- Use query_index first to locate symbols/files; fall back to read_file / search_files if more detail is needed
-- After presenting the plan, ask: "Does this look good? Any concerns?"
-- WAIT for explicit user approval before saying anything else
-- Only after approval say: "Type /execute when ready."
+Describe WHAT to change, not HOW. No code or snippets.
+Ask "Does this look good?" and wait for approval, then say "Type /execute when ready."
 `,
 	},
 	{
@@ -123,30 +113,22 @@ Rules:
 			"run_command", // build, tests allowed
 			"query_index",
 		},
-		Prompt: `# EXECUTE
-STOP. You are in EXECUTE phase. You MUST follow the approved plan exactly.
-If you are about to deviate from the plan, stop and ask the user first.
+		Prompt: `# EXECUTE (follow the approved plan exactly, no deviations)
 
-Use query_index(query_type="symbols", name="<symbol>") to find the exact file and line for any symbol before calling read_file.
+For each file in the plan:
 
-For each file in the plan, in dependency order:
+To MODIFY a file:
+1. query_index(query_type="symbols", name="<symbol>") — locate exact file/line
+2. read_file — get content and line hashes
+3. edit_file — use hashes from step 2 (never guess; on mismatch re-read and retry)
+4. Report: "✓ Modified <path> — <reason>"
 
-MODIFY an existing file:
-1. Call read_file to get current content and line hashes
-2. Call edit_file using the exact hashes returned by read_file
-3. Report: "✓ Modified <path> (<N> edits) — <reason>"
-
-CREATE a new file:
-1. Call edit_file with create_file operation
+To CREATE a file:
+1. edit_file with create_file operation
 2. Report: "✓ Created <path> — <purpose>"
 
-Rules:
-- NEVER guess or reuse hashes; always read_file first
-- Hash mismatch → re-read the file and retry with new hashes
-- Make minimal changes only; do not refactor beyond the plan
-- If something unexpected blocks you, STOP and ask the user
-
-When all files are done, tell the user: "Type /verify when ready."
+Work through all files, then say: "Type /verify when ready."
+If something unexpected blocks progress, stop and ask the user.
 `,
 	},
 	{
@@ -160,39 +142,27 @@ When all files are done, tell the user: "Type /verify when ready."
 			"run_command", // tests, linters, builds allowed
 			"query_index",
 		},
-		Prompt: `# VERIFY (read-only)
-STOP. You are in VERIFY phase. You MUST NOT write, create, or modify any file.
-If you are about to call edit_file, stop and reread this prompt.
+		Prompt: `# VERIFY (read-only, no file edits)
 
-Run each check in order (skip if not applicable), then produce the report below.
+Run in order, skip if not applicable:
+1. run_command — build (go build ./..., npm run build, cargo build, etc.)
+2. run_command — tests (go test ./..., pytest, npm test, etc.)
+3. run_command — lint (go vet ./..., eslint, gofmt -l, etc.)
+4. read_file on each modified file — confirm logic matches plan, no unintended changes
 
-1. BUILD  — detect project type, run build command (go build, npm run build, cargo build, etc.)
-2. TESTS  — run test suite (go test ./..., pytest, npm test, etc.)
-3. LINT   — run linters (gofmt, eslint, golangci-lint, etc.)
-4. REVIEW — use query_index(query_type="files") to list files, then read_file on modified files:
-            verify syntax, logic matches plan, no unintended changes
-
-Output a report in this exact format:
+Then output:
 
 ## RESULT
 <PASS | FAIL | PARTIAL>
-
-## FILES CHANGED
-- <path>: <what was implemented>
-
 ## CHECKS
-- Build:  <passed | failed — errors>
-- Tests:  <passed | N failed — summary>
-- Lint:   <clean | N issues — summary>
+- Build: <passed | failed: errors>
+- Tests: <passed | N failed: summary>
+- Lint:  <clean | issues: summary>
 - Review: <ok | issues found>
-
 ## ISSUES
-<list any failures, unexpected behaviour, or concerns; "none" if clean>
+<failures or concerns; "none" if clean>
 
-## RECOMMENDATIONS
-<optional improvements or follow-ups; "none" if not needed>
-
-When done, tell the user: "Type /plan for next task."
+Tell the user: "Type /plan for next task."
 `,
 	},
 }

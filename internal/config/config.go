@@ -56,6 +56,7 @@ type ModelProfile struct {
 	APIKey      string  `yaml:"api_key,omitempty"`
 	MaxTokens   int     `yaml:"max_tokens,omitempty"`
 	Temperature float32 `yaml:"temperature,omitempty"`
+	ContextSize int     `yaml:"context_size,omitempty"`
 }
 
 // Config holds the application configuration
@@ -66,6 +67,7 @@ type Config struct {
 	Model              string                    `yaml:"model"`
 	Temperature        float32                   `yaml:"temperature"`
 	MaxTokens          int                       `yaml:"max_tokens"`
+	ContextSize        int                       `yaml:"context_size,omitempty"`
 	SystemPrompt       string                    `yaml:"system_prompt"`
 	Phases             []PhaseConfig             `yaml:"phases,omitempty"`
 	InitialPhase       string                    `yaml:"initial_phase,omitempty"`
@@ -176,6 +178,7 @@ func (c *Config) ApplyProfile(name string) error {
 	if p.APIKey != ""        { c.APIKey = p.APIKey }
 	if p.MaxTokens > 0   { c.MaxTokens = p.MaxTokens }
 	if p.Temperature > 0 { c.Temperature = p.Temperature }
+	if p.ContextSize > 0 { c.ContextSize = p.ContextSize }
 	return nil
 }
 

@@ -35,7 +35,8 @@ type Model struct {
 	messages       []client.Message // Chat history
 	isProcessing   bool             // Is AI responding?
 	currentPhase   string           // Current workflow phase
-	systemMessage  string           // Top notification bar
+	systemMessage  string           // Top notification bar (transient)
+	warnMessage    string           // Persistent warning shown in status bar
 	tokenCount     int              // Token usage
 	err            error            // Last error
 	streamTextChan <-chan string    // Active stream text channel

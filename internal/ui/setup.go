@@ -102,7 +102,13 @@ func SetupModel(cfg *config.Config, aiClient *client.OpenAIClient) Model {
 	initializePhase(phaseManager, aiClient)
 
 	// Create and return model
-	return NewModel(cfg, aiClient, phaseManager, phaseController)
+	m := NewModel(cfg, aiClient, phaseManager, phaseController)
+
+	if cfg.ContextSize == 0 {
+		m.warnMessage = "context_size not set — compaction disabled"
+	}
+
+	return m
 }
 
 // initializePhase injects the initial phase prompt and allowed tools.
