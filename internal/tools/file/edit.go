@@ -75,48 +75,47 @@ func NewEditExecutor(workingDir string) *EditExecutor {
 func NewEditFileTool() client.Tool {
 	return client.NewFunctionTool(
 		"edit_file",
-		"Make surgical edits to files using hash-based line addressing. ALWAYS call read_file first to get current line hashes, then use those exact hashes to specify edit locations. Operations: replace_lines (modify lines), insert_after_hash (add after line), insert_before_hash (add before line), delete_by_hash (remove lines), create_file (new file). Hash format: 8-char hex from read_file response. Never guess hashes - always use values from read_file.",
+		"Edit a file using hash-based line addressing. Hashes come from read_file. Operations: replace_lines, insert_after_hash, insert_before_hash, delete_by_hash, create_file.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"file_path": map[string]interface{}{
 					"type":        "string",
-					"description": "Relative path to the file to edit",
+					"description": "Relative path to the file",
 				},
 				"edits": map[string]interface{}{
 					"type":        "array",
-					"description": "List of edit operations to apply sequentially",
+					"description": "Edit operations to apply sequentially",
 					"items": map[string]interface{}{
 						"type": "object",
 						"properties": map[string]interface{}{
 							"type": map[string]interface{}{
-								"type":        "string",
-								"enum":        []string{"replace_lines", "insert_after_hash", "insert_before_hash", "delete_by_hash", "create_file"},
-								"description": "Type of edit operation",
+								"type": "string",
+								"enum": []string{"replace_lines", "insert_after_hash", "insert_before_hash", "delete_by_hash", "create_file"},
 							},
 							"start_hash": map[string]interface{}{
 								"type":        "string",
-								"description": "Hash of first line to replace/delete (8-char hex from read_file)",
+								"description": "Hash of first line to replace/delete",
 							},
 							"end_hash": map[string]interface{}{
 								"type":        "string",
-								"description": "Hash of last line to replace/delete (optional, defaults to start_hash)",
+								"description": "Hash of last line to replace/delete (defaults to start_hash)",
 							},
 							"after_hash": map[string]interface{}{
 								"type":        "string",
-								"description": "Hash of line to insert after (for insert_after_hash)",
+								"description": "Hash of line to insert after",
 							},
 							"before_hash": map[string]interface{}{
 								"type":        "string",
-								"description": "Hash of line to insert before (for insert_before_hash)",
+								"description": "Hash of line to insert before",
 							},
 							"new_content": map[string]interface{}{
 								"type":        "string",
-								"description": "New content for replace_lines operation",
+								"description": "Replacement content for replace_lines",
 							},
 							"content": map[string]interface{}{
 								"type":        "string",
-								"description": "Content for insert operations or create_file",
+								"description": "Content for insert or create_file operations",
 							},
 						},
 						"required": []string{"type"},

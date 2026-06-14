@@ -15,7 +15,7 @@ const maxResults = 200
 func NewQueryIndexTool() client.Tool {
 	return client.NewFunctionTool(
 		"query_index",
-		"Query the pre-built codebase index for files and symbols. Much faster than grep or glob for finding where functions, types, and structs are defined. query_type: 'files' lists indexed files; 'symbols' lists symbols (functions, types, etc.).",
+		"Query the codebase index. query_type='files' lists files; query_type='symbols' finds functions, types, structs by name/kind/package.",
 		map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
