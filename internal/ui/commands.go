@@ -1,64 +1,11 @@
 package ui
 
 import (
-	"context"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/ilmich/emmai/internal/client"
 	"github.com/ilmich/emmai/internal/phase"
 	"github.com/ilmich/emmai/internal/storage"
 )
-
-// streamAIResponseCmd starts streaming from OpenAI and converts channel messages to Bubble Tea messages
-func streamAIResponseCmd(ctx context.Context, client *client.OpenAIClient, userMsg string) tea.Cmd {
-	return func() tea.Msg {
-		textChan, errChan := client.SendMessage(ctx, userMsg)
-
-		// Wait for first message from either channel
-		select {
-		case <-ctx.Done():
-			// Context cancelled (ESC pressed)
-			return interruptStreamMsg{}
-
-		case chunk, ok := <-textChan:
-			if !ok {
-				// Channel closed, streaming done
-				return streamDoneMsg{}
-			}
-			// Return chunk and listen for more
-			return streamChunkMsg(chunk)
-
-		case err := <-errChan:
-			// Error occurred
-			if err != nil {
-				return streamErrorMsg{err: err}
-			}
-			return streamDoneMsg{}
-		}
-	}
-}
-
-// listenForStreamCmd continues listening for stream messages
-func listenForStreamCmd(textChan <-chan string, errChan <-chan error, ctx context.Context) tea.Cmd {
-	return func() tea.Msg {
-		select {
-		case <-ctx.Done():
-			return interruptStreamMsg{}
-
-		case chunk, ok := <-textChan:
-			if !ok {
-				return streamDoneMsg{}
-			}
-			return streamChunkMsg(chunk)
-
-		case err := <-errChan:
-			if err != nil {
-				return streamErrorMsg{err: err}
-			}
-			return streamDoneMsg{}
-		}
-	}
-}
 
 // transitionPhaseCmd transitions to a new phase
 func transitionPhaseCmd(controller *phase.Controller, phaseName string) tea.Cmd {

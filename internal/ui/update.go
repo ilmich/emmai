@@ -56,8 +56,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamDoneMsg:
 		m.isProcessing = false
+		if m.streamCancel != nil {
+			m.streamCancel()
+		}
 		m.streamTextChan = nil
 		m.streamErrChan = nil
+		m.streamCancel = nil
 		m.systemMessage = "✓ Response complete"
 		m.refreshViewportContent(m.formatMessage)
 		m.viewport.GotoBottom()
@@ -67,8 +71,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case streamErrorMsg:
 		m.isProcessing = false
+		if m.streamCancel != nil {
+			m.streamCancel()
+		}
 		m.streamTextChan = nil
 		m.streamErrChan = nil
+		m.streamCancel = nil
 		m.err = msg.err
 		m.systemMessage = fmt.Sprintf("✗ Error: %v", msg.err)
 
