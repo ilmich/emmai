@@ -82,7 +82,7 @@ func (m Model) formatMessage(msg client.Message, isLast bool) string {
 		roleName = "You"
 	case "assistant":
 		roleStyle = assistantMessageStyle
-		roleName = "Assistant"
+		roleName = "[" + m.currentPhase + "]" + m.config.Model
 	case "system":
 		roleStyle = systemMessageStyle2
 		roleName = "System"
