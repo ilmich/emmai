@@ -30,3 +30,6 @@ type clearConversationMsg struct{}
 
 // interruptStreamMsg cancels current AI streaming
 type interruptStreamMsg struct{}
+
+// showHelpMsg toggles the help popup
+type showHelpMsg struct{}
