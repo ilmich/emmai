@@ -39,15 +39,56 @@ type Model struct {
 	streamErrChan  <-chan error
 
 	// UI State
-	width   int
-	height  int
-	ready   bool
-	workDir string
+	width    int
+	height   int
+	ready    bool
+	workDir  string
+	showHelp bool
 
 	// Scrollbar positioning for mouse interaction
 	scrollbarX      int
 	scrollbarY      int
 	scrollbarHeight int
+
+	// Slash-command completion
+	completions   []completionItem
+	completionIdx int
+}
+
+type completionItem struct {
+	name string
+	desc string
+}
+
+var availableCommands = []completionItem{
+	{"/exit", "Quit EmmAI"},
+	{"/help", "Show keyboard shortcuts and commands"},
+}
+
+func (m *Model) updateCompletions() {
+	text := m.textarea.Value()
+	if !strings.HasPrefix(text, "/") || strings.Contains(text, "\n") {
+		m.completions = nil
+		m.completionIdx = 0
+		return
+	}
+	var filtered []completionItem
+	for _, c := range availableCommands {
+		if strings.HasPrefix(c.name, text) {
+			filtered = append(filtered, c)
+		}
+	}
+	if len(filtered) != len(m.completions) {
+		m.completionIdx = 0
+	}
+	m.completions = filtered
+}
+
+func (m *Model) completionHeight() int {
+	if len(m.completions) == 0 {
+		return 0
+	}
+	return len(m.completions) + 2
 }
 
 // NewModel creates a new Bubble Tea model
@@ -104,7 +145,7 @@ func (m *Model) updateComponentSizes() {
 		sidebarTotal        = SidebarWidth + borderPadding // sidebar content + its own borders/padding
 	)
 
-	totalFixedHeight := statusBarHeight + bannerHeight + systemMessageHeight + inputBoxHeight + helpBarHeight
+	totalFixedHeight := statusBarHeight + bannerHeight + systemMessageHeight + inputBoxHeight + helpBarHeight + m.completionHeight()
 	chatHeight := m.height - totalFixedHeight - borderPadding
 
 	if chatHeight < 5 {

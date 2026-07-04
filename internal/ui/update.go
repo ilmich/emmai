@@ -27,7 +27,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// === Keyboard Input ===
 	case tea.KeyMsg:
-		return m.handleKeyPress(msg)
+		prevCompletionCount := len(m.completions)
+		result, cmd := m.handleKeyPress(msg)
+		rm := result.(Model)
+		if len(rm.completions) != prevCompletionCount {
+			rm.updateComponentSizes()
+			rm.refreshViewportContent(rm.formatMessage)
+		}
+		return rm, cmd
 
 	// === Mouse Input ===
 	case tea.MouseMsg:
@@ -169,6 +176,17 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case tea.KeyEsc:
+		// Close help popup if open
+		if m.showHelp {
+			m.showHelp = false
+			return m, nil
+		}
+		// Dismiss completions
+		if len(m.completions) > 0 {
+			m.completions = nil
+			m.completionIdx = 0
+			return m, nil
+		}
 		// Interrupt streaming if processing
 		if m.isProcessing {
 			if m.streamCancel != nil {
@@ -194,11 +212,43 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Retry last message
 		return m.retryLastMessage()
 
+	case tea.KeyUp:
+		if len(m.completions) > 0 {
+			m.completionIdx--
+			if m.completionIdx < 0 {
+				m.completionIdx = len(m.completions) - 1
+			}
+			return m, nil
+		}
+
+	case tea.KeyDown:
+		if len(m.completions) > 0 {
+			m.completionIdx = (m.completionIdx + 1) % len(m.completions)
+			return m, nil
+		}
+
+	case tea.KeyTab:
+		if len(m.completions) > 0 {
+			m.textarea.SetValue(m.completions[m.completionIdx].name)
+			m.textarea.CursorEnd()
+			m.completions = nil
+			m.completionIdx = 0
+			return m, nil
+		}
+
 	case tea.KeyEnter:
 		// Check if Shift is held (for multi-line)
 		if msg.Alt {
 			// Shift+Enter: pass to textarea for new line
 			break
+		}
+
+		// If completions visible, accept selected entry
+		if len(m.completions) > 0 {
+			selected := m.completions[m.completionIdx].name
+			m.completions = nil
+			m.completionIdx = 0
+			return m.handleSendMessage(selected)
 		}
 
 		// Plain Enter: send message
@@ -212,11 +262,24 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Pass to textarea for normal typing
 	var cmd tea.Cmd
 	m.textarea, cmd = m.textarea.Update(msg)
+	m.updateCompletions()
 	return m, cmd
 }
 
 // handleSendMessage processes user message submission
 func (m Model) handleSendMessage(message string) (tea.Model, tea.Cmd) {
+	switch message {
+	case "/exit", "/quit":
+		if m.cancel != nil {
+			m.cancel()
+		}
+		return m, tea.Quit
+	case "/help":
+		m.textarea.Reset()
+		m.showHelp = true
+		return m, nil
+	}
+
 	// Regular message - send to AI
 	m.isProcessing = true
 	m.systemMessage = "Sending..."

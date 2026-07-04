@@ -20,11 +20,26 @@ func (m Model) View() string {
 		GetBanner(),
 		m.renderSystemMessage(),
 		m.renderChatViewport(),
+	}
+	if comp := m.renderCompletions(); comp != "" {
+		sections = append(sections, comp)
+	}
+	sections = append(sections,
 		m.renderInputBox(),
 		m.renderHelpBar(),
+	)
+
+	base := lipgloss.JoinVertical(lipgloss.Left, sections...)
+
+	if m.showHelp {
+		popup := popupStyle.Render(GetHelpPopupText())
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, popup,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+		)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+	return base
 }
 
 // renderStatusBar renders the top status bar
@@ -156,6 +171,28 @@ func (m Model) formatMessage(msg client.Message, isLast bool) string {
 	}
 
 	return header + content
+}
+
+// renderCompletions renders the slash-command completion popup
+func (m Model) renderCompletions() string {
+	if len(m.completions) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for i, c := range m.completions {
+		var nameStr, descStr string
+		if i == m.completionIdx {
+			nameStr = completionSelectedStyle.Render(c.name)
+		} else {
+			nameStr = completionItemStyle.Render(c.name)
+		}
+		descStr = completionDescStyle.Render("  " + c.desc)
+		sb.WriteString(nameStr + descStr)
+		if i < len(m.completions)-1 {
+			sb.WriteString("\n")
+		}
+	}
+	return completionBoxStyle.Width(m.width - 6).Render(sb.String())
 }
 
 // renderInputBox renders the user input textarea

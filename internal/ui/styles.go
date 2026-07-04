@@ -125,7 +125,50 @@ func GetBanner() string {
 	return bannerStyle.Render(banner)
 }
 
+// completionStyle renders the slash-command completion list
+var (
+	completionBoxStyle = lipgloss.NewStyle().
+				BorderStyle(lipgloss.RoundedBorder()).
+				BorderForeground(colorCyan).
+				Background(lipgloss.Color("0")).
+				Padding(0, 1)
+
+	completionItemStyle = lipgloss.NewStyle().
+				Foreground(colorWhite)
+
+	completionSelectedStyle = lipgloss.NewStyle().
+				Foreground(colorCyan).
+				Bold(true)
+
+	completionDescStyle = lipgloss.NewStyle().
+				Foreground(colorGray)
+)
+
+// popupStyle renders the help popup overlay
+var popupStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.RoundedBorder()).
+	BorderForeground(colorCyan).
+	Padding(1, 3).
+	Background(lipgloss.Color("0"))
+
 // GetHelpText returns the help bar text
 func GetHelpText() string {
-	return "[Enter] Send | [/plan /execute /verify] Phase | [ESC] Stop | [Ctrl+L] Clear | [Ctrl+R] Retry | [Ctrl+Q] Quit"
+	return "[Enter] Send | [ESC] Stop | [Ctrl+L] Clear | [Ctrl+R] Retry | [Ctrl+Q] Quit | /help"
+}
+
+// GetHelpPopupText returns the content for the help popup
+func GetHelpPopupText() string {
+	return lipgloss.NewStyle().Foreground(colorCyan).Bold(true).Render("EmmAI — Keyboard Shortcuts & Commands") + "\n\n" +
+		lipgloss.NewStyle().Foreground(colorDarkCyan).Bold(true).Render("── Keyboard ──") + "\n" +
+		"  Enter          Send message\n" +
+		"  Shift+Enter    New line in input\n" +
+		"  ESC            Stop streaming / close popup\n" +
+		"  Ctrl+L         Clear conversation\n" +
+		"  Ctrl+R         Retry last message\n" +
+		"  Ctrl+Q / Ctrl+C  Quit\n" +
+		"  Page Up/Down   Scroll chat history\n\n" +
+		lipgloss.NewStyle().Foreground(colorDarkCyan).Bold(true).Render("── Slash Commands ──") + "\n" +
+		"  /help          Show this help\n" +
+		"  /exit          Quit EmmAI\n\n" +
+		lipgloss.NewStyle().Foreground(colorGray).Render("Press ESC to close")
 }
