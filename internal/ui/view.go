@@ -34,8 +34,8 @@ func (m Model) renderStatusBar() string {
 		customEndpoint = " (Custom)"
 	}
 
-	status := fmt.Sprintf("Model: %s%s | Tokens: %d | Phase: %s",
-		m.config.Model, customEndpoint, m.tokenCount, m.currentPhase)
+	status := fmt.Sprintf("Model: %s%s | Tokens: %d",
+		m.config.Model, customEndpoint, m.tokenCount)
 
 	if m.warnMessage != "" {
 		status += " | ⚠ " + m.warnMessage
@@ -109,7 +109,6 @@ func (m Model) renderSidebar() string {
 		row("compact:", compactionStatus),
 		"",
 		section("── Session ──"),
-		row("phase:", m.currentPhase),
 		row("messages:", fmt.Sprintf("%d", len(m.messages))),
 	}
 
@@ -135,7 +134,7 @@ func (m Model) formatMessage(msg client.Message, isLast bool) string {
 		roleName = "You"
 	case "assistant":
 		roleStyle = assistantMessageStyle
-		roleName = "[" + m.currentPhase + "]" + m.config.Model
+		roleName = m.config.Model
 	case "system":
 		roleStyle = systemMessageStyle2
 		roleName = "System"

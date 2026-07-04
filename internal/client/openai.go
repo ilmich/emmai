@@ -16,16 +16,14 @@ import (
 
 // OpenAIClient wraps the OpenAI API client
 type OpenAIClient struct {
-	client                   *openai.Client
-	config                   *config.Config
-	conversation             *Conversation
-	toolRegistry             *ToolRegistry
-	toolExecutor             ToolExecutor
-	toolChoice               ToolChoice
-	phasePrompt              string   // Current phase-specific prompt
-	currentPhaseAllowedTools []string // Tools allowed in current phase
-	compacted                bool     // Set when automatic compaction fired this turn
-	lastPromptTokens         int      // Exact prompt token count from last API response
+	client           *openai.Client
+	config           *config.Config
+	conversation     *Conversation
+	toolRegistry     *ToolRegistry
+	toolExecutor     ToolExecutor
+	toolChoice       ToolChoice
+	compacted        bool // Set when automatic compaction fired this turn
+	lastPromptTokens int  // Exact prompt token count from last API response
 }
 
 // NewOpenAIClient creates a new OpenAI client
@@ -55,13 +53,11 @@ func NewOpenAIClient(cfg *config.Config) (*OpenAIClient, error) {
 	}
 
 	return &OpenAIClient{
-		client:                   openai.NewClientWithConfig(clientConfig),
-		config:                   cfg,
-		conversation:             NewConversation(cfg.Model),
-		toolRegistry:             NewToolRegistry(),
-		toolChoice:               "auto", // Default to auto tool selection
-		phasePrompt:              "",     // No phase prompt initially
-		currentPhaseAllowedTools: []string{}, // No phase filtering initially
+		client:       openai.NewClientWithConfig(clientConfig),
+		config:       cfg,
+		conversation: NewConversation(cfg.Model),
+		toolRegistry: NewToolRegistry(),
+		toolChoice:   "auto",
 	}, nil
 }
 
@@ -137,7 +133,7 @@ func (c *OpenAIClient) TakeCompacted() bool {
 func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- string, errChan chan<- error) {
 	// Compact conversation if approaching context limit
 	if c.config.ContextSize > 0 {
-		systemTokens := len(c.config.SystemPrompt)/4 + len(c.phasePrompt)/4
+		systemTokens := len(c.config.SystemPrompt) / 4
 		msgTokens := 0
 		for _, m := range c.conversation.Messages {
 			msgTokens += len(m.Content)/4 + 1
@@ -165,8 +161,7 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 
 		// Add tools if any are registered
 		if c.toolRegistry.HasTools() {
-			// Get filtered tools based on current phase
-			tools := c.getFilteredTools()
+			tools := c.toolRegistry.GetAllTools()
 			openaiTools := make([]openai.Tool, len(tools))
 			for i, tool := range tools {
 				openaiTools[i] = openai.Tool{
@@ -321,13 +316,8 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 func (c *OpenAIClient) buildAPIMessages() []openai.ChatCompletionMessage {
 	messages := make([]openai.ChatCompletionMessage, 0, len(c.conversation.Messages)+1)
 
-	// Build complete system prompt: base + phase
-	systemPrompt := c.config.SystemPrompt
-	if c.phasePrompt != "" {
-		systemPrompt = systemPrompt + "\n\n" + c.phasePrompt
-	}
-
 	// Add system prompt if configured and not already in history
+	systemPrompt := c.config.SystemPrompt
 	if systemPrompt != "" {
 		hasSystemMessage := false
 		for _, msg := range c.conversation.Messages {
@@ -414,9 +404,6 @@ func (c *OpenAIClient) GetTokenCount() int {
 	if c.config.SystemPrompt != "" {
 		total += len(c.config.SystemPrompt) / 4
 	}
-	if c.phasePrompt != "" {
-		total += len(c.phasePrompt) / 4
-	}
 	return total
 }
 
@@ -439,45 +426,6 @@ func (c *OpenAIClient) SetToolChoice(choice ToolChoice) {
 // GetToolRegistry returns the tool registry
 func (c *OpenAIClient) GetToolRegistry() *ToolRegistry {
 	return c.toolRegistry
-}
-
-// SetPhasePrompt updates the current phase-specific prompt
-func (c *OpenAIClient) SetPhasePrompt(prompt string) {
-	c.phasePrompt = prompt
-}
-
-// GetPhasePrompt returns the current phase prompt
-func (c *OpenAIClient) GetPhasePrompt() string {
-	return c.phasePrompt
-}
-
-// SetPhaseAllowedTools updates the allowed tools for the current phase
-func (c *OpenAIClient) SetPhaseAllowedTools(allowedTools []string) {
-	c.currentPhaseAllowedTools = allowedTools
-}
-
-// getFilteredTools returns tools filtered by phase allowed list
-func (c *OpenAIClient) getFilteredTools() []Tool {
-	// If no phase filtering is active, return all tools
-	if len(c.currentPhaseAllowedTools) == 0 {
-		return c.toolRegistry.GetAllTools()
-	}
-
-	// Create lookup map for fast checking
-	allowed := make(map[string]bool)
-	for _, name := range c.currentPhaseAllowedTools {
-		allowed[name] = true
-	}
-
-	// Filter tools
-	filtered := make([]Tool, 0)
-	for _, tool := range c.toolRegistry.GetAllTools() {
-		if allowed[tool.Function.Name] {
-			filtered = append(filtered, tool)
-		}
-	}
-
-	return filtered
 }
 
 // formatToolArguments formats JSON arguments for readable display with 80-char lines

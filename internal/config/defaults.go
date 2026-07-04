@@ -12,8 +12,7 @@ const (
 
 	// DefaultSystemPrompt sets the AI's behavior
 	DefaultSystemPrompt = `You are EmmAI, an interactive coding agent for software engineering tasks.
-Be concise: brief status after tool use, technical accuracy over verbosity (e.g. "Updated handleRequest in server.go:45").
-Phase transitions are controlled by slash commands: /plan /execute /verify /reset.`
+Be concise: brief status after tool use, technical accuracy over verbosity (e.g. "Updated handleRequest in server.go:45").`
 
 	// DefaultBaseURL is the default OpenAI API endpoint
 	DefaultBaseURL = "https://api.openai.com/v1"
@@ -26,9 +25,6 @@ Phase transitions are controlled by slash commands: /plan /execute /verify /rese
 
 	// ConfigFileName is the name of the config file
 	ConfigFileName = "config.yaml"
-
-	// DefaultInitialPhase is the starting phase
-	DefaultInitialPhase = "plan"
 )
 
 // DefaultSecurityPolicy returns the default security policy
@@ -38,21 +34,18 @@ func DefaultSecurityPolicy() SecurityPolicy {
 			Enabled: true,
 			AllowedCommands: []AllowedCommand{
 				{
-					Prefix:        "go",
-					Subcommands:   []string{"test", "build", "mod", "fmt", "vet", "get"},
-					BlockedArgs:   []string{"run"},
-					AllowedPhases: []string{"execute", "verify"},
+					Prefix:      "go",
+					Subcommands: []string{"test", "build", "mod", "fmt", "vet", "get"},
+					BlockedArgs: []string{"run"},
 				},
 				{
-					Prefix:        "git",
-					Subcommands:   []string{"status", "diff", "log", "branch", "show"},
-					BlockedArgs:   []string{"push", "pull", "clone", "reset"},
-					AllowedPhases: []string{"plan", "execute", "verify"},
+					Prefix:      "git",
+					Subcommands: []string{"status", "diff", "log", "branch", "show"},
+					BlockedArgs: []string{"push", "pull", "clone", "reset"},
 				},
 				{
-					Prefix:        "make",
-					Subcommands:   []string{"build", "test", "clean"},
-					AllowedPhases: []string{"execute", "verify"},
+					Prefix:      "make",
+					Subcommands: []string{"build", "test", "clean"},
 				},
 			},
 			DefaultTimeoutSec:  30,
@@ -64,108 +57,3 @@ func DefaultSecurityPolicy() SecurityPolicy {
 	}
 }
 
-// DefaultPhases defines the default workflow phases
-var DefaultPhases = []PhaseConfig{
-	{
-		Name:      "plan",
-		ReadOnly:  true,
-		NextPhase: "execute",
-		AllowedTools: []string{
-			"read_file",
-			"search_files",
-			"glob_files",
-			"query_index",
-			"fetch_url",
-		},
-		Prompt: `# PLAN (read-only, no file edits, no code output)
-
-## Phase 1 — Research (tool calls only, no text output)
-Call these tools now. Do not write any text until all calls have returned.
-- query_index(query_type="files") — survey all project files
-- query_index(query_type="symbols", name="<relevant term>") — locate functions/types to change
-- read_file on each file you will modify (max 3)
-
-## Phase 2 — Plan (only after Phase 1 tool calls complete)
-Output exactly this:
-
-### STEPS
-1. ...
-
-### RISKS
-- ...
-
-Rules:
-- WHAT to change, never HOW — no code, no snippets, no pseudocode, no diffs
-- If you are about to write a code block, stop and describe it in plain English instead
-Ask "Does this look good?" and wait for approval, then say "Type /execute when ready."
-`,
-	},
-	{
-		Name:      "execute",
-		ReadOnly:  false,
-		NextPhase: "verify",
-		AllowedTools: []string{
-			"read_file",
-			"edit_file",
-			"delete_file",
-			"search_files",
-			"glob_files",
-			"run_command", // build, tests allowed
-			"query_index",
-			"fetch_url",
-		},
-		Prompt: `# EXECUTE (follow the approved plan exactly, no deviations)
-
-For each file in the plan:
-
-To MODIFY a file:
-1. query_index(query_type="symbols", name="<symbol>") — locate exact file/line
-2. read_file — get content and line hashes
-3. edit_file with preview_only=true — review the diff, confirm it matches intent
-4. edit_file without preview_only — apply (same edits, no changes)
-5. Report: "✓ Modified <path> — <reason>"
-
-To CREATE a file:
-1. edit_file with create_file operation
-2. Report: "✓ Created <path> — <purpose>"
-
-Work through all files, then say: "Type /verify when ready."
-If something unexpected blocks progress, stop and ask the user.
-`,
-	},
-	{
-		Name:      "verify",
-		ReadOnly:  true,
-		NextPhase: "plan",
-		AllowedTools: []string{
-			"read_file",
-			"search_files",
-			"glob_files",
-			"run_command", // tests, linters, builds allowed
-			"query_index",
-			"fetch_url",
-		},
-		Prompt: `# VERIFY (read-only, no file edits)
-
-Run in order, skip if not applicable:
-1. run_command — build (go build ./..., npm run build, cargo build, etc.)
-2. run_command — tests (go test ./..., pytest, npm test, etc.)
-3. run_command — lint (go vet ./..., eslint, gofmt -l, etc.)
-4. read_file on each modified file — confirm logic matches plan, no unintended changes
-
-Then output:
-
-## RESULT
-<PASS | FAIL | PARTIAL>
-## CHECKS
-- Build: <passed | failed: errors>
-- Tests: <passed | N failed: summary>
-- Lint:  <clean | issues: summary>
-- Review: <ok | issues found>
-## ISSUES
-<failures or concerns; "none" if clean>
-
-Tell the user: "Type /plan for next task."
-`,
-	},
-}

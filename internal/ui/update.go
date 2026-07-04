@@ -119,27 +119,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// === Phase Transitions ===
-	case phaseTransitionMsg:
-		m.currentPhase = msg.phaseName
-		m.systemMessage = fmt.Sprintf("✓ %s phase", msg.phaseName)
-		m.appendMessage(client.Message{
-			Role:      "system",
-			Content:   fmt.Sprintf("Switched to %s phase", msg.phaseName),
-			Timestamp: time.Now(),
-		})
-		m.refreshViewportContent(m.formatMessage)
-		m.viewport.GotoBottom()
-		if msg.autoStart {
-			_, cmd := m.handleSendMessage("Begin.")
-			return m, cmd
-		}
-		return m, nil
-
-	case phaseTransitionErrorMsg:
-		m.systemMessage = fmt.Sprintf("✗ Failed to switch to %s: %v", msg.phaseName, msg.err)
-		return m, nil
-
 	// === Conversation Management ===
 	case conversationLoadedMsg:
 		if msg.messageCount > 0 {
@@ -238,12 +217,6 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleSendMessage processes user message submission
 func (m Model) handleSendMessage(message string) (tea.Model, tea.Cmd) {
-	// Check for slash commands
-	if strings.HasPrefix(message, "/") {
-		m.textarea.Reset()
-		return m.handleSlashCommand(message)
-	}
-
 	// Regular message - send to AI
 	m.isProcessing = true
 	m.systemMessage = "Sending..."
@@ -271,66 +244,6 @@ func (m Model) handleSendMessage(message string) (tea.Model, tea.Cmd) {
 
 	// Start AI streaming
 	return m, listenForNextStreamMsg(textChan, errChan, m.streamCtx)
-}
-
-// handleSlashCommand processes slash commands
-func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
-	parts := strings.Fields(command)
-	if len(parts) == 0 {
-		return m, nil
-	}
-
-	cmd := strings.ToLower(parts[0])
-
-	switch cmd {
-	case "/plan":
-		m.systemMessage = "Switching to PLAN phase..."
-		return m, transitionPhaseCmd(m.phaseController, "plan", false)
-
-	case "/execute":
-		m.systemMessage = "Switching to EXECUTE phase..."
-		return m, transitionPhaseCmd(m.phaseController, "execute", true)
-
-	case "/verify":
-		m.systemMessage = "Switching to VERIFY phase..."
-		return m, transitionPhaseCmd(m.phaseController, "verify", true)
-
-	case "/reset":
-		m.systemMessage = "Resetting to initial phase..."
-		return m, resetPhaseCmd(m.phaseController)
-
-	case "/status":
-		isReadOnly := map[bool]string{true: "read-only", false: "writable"}[m.phaseManager.IsReadOnly()]
-		status := fmt.Sprintf("Current phase: %s (%s)", m.currentPhase, isReadOnly)
-		m.systemMessage = status
-		m.appendMessage(client.Message{
-			Role:      "system",
-			Content:   status,
-			Timestamp: time.Now(),
-		})
-		return m, nil
-
-	case "/help":
-		help := `Available commands:
-  /plan     - Switch to PLAN phase
-  /execute  - Switch to EXECUTE phase
-  /verify   - Switch to VERIFY phase
-  /reset    - Reset to initial phase
-  /status   - Show current phase
-  /help     - Show this help`
-
-		m.appendMessage(client.Message{
-			Role:      "system",
-			Content:   help,
-			Timestamp: time.Now(),
-		})
-		m.systemMessage = "Available commands: /plan, /execute, /verify, /reset, /status, /help"
-		return m, nil
-
-	default:
-		m.systemMessage = fmt.Sprintf("Unknown command: %s (try /help)", cmd)
-		return m, nil
-	}
 }
 
 // streamAIResponse is no longer needed - integrated into handleSendMessage

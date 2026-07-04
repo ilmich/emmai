@@ -11,57 +11,53 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/ilmich/emmai/internal/client"
 	"github.com/ilmich/emmai/internal/config"
-	"github.com/ilmich/emmai/internal/phase"
 )
 
 // Model holds the entire application state
 type Model struct {
 	// Core dependencies
-	client          *client.OpenAIClient
-	config          *config.Config
-	phaseManager    *phase.Manager
-	phaseController *phase.Controller
-	ctx             context.Context
-	cancel          context.CancelFunc
-	streamCtx       context.Context
-	streamCancel    context.CancelFunc
+	client       *client.OpenAIClient
+	config       *config.Config
+	ctx          context.Context
+	cancel       context.CancelFunc
+	streamCtx    context.Context
+	streamCancel context.CancelFunc
 
 	// UI Components (Bubbles)
-	viewport viewport.Model // Chat message display
-	textarea textarea.Model // User input
-	spinner  spinner.Model  // Loading indicator
+	viewport viewport.Model
+	textarea textarea.Model
+	spinner  spinner.Model
 
 	// Application State
-	messages       []client.Message // Chat history
-	isProcessing   bool             // Is AI responding?
-	currentPhase   string           // Current workflow phase
-	systemMessage  string           // Top notification bar (transient)
-	warnMessage    string           // Persistent warning shown in status bar
-	tokenCount     int              // Token usage
-	err            error            // Last error
-	streamTextChan <-chan string    // Active stream text channel
-	streamErrChan  <-chan error     // Active stream error channel
+	messages       []client.Message
+	isProcessing   bool
+	systemMessage  string
+	warnMessage    string
+	tokenCount     int
+	err            error
+	streamTextChan <-chan string
+	streamErrChan  <-chan error
 
 	// UI State
-	width   int    // Terminal width
-	height  int    // Terminal height
-	ready   bool   // Has received first WindowSizeMsg?
-	workDir string // Project working directory (for conversation storage)
+	width   int
+	height  int
+	ready   bool
+	workDir string
 
 	// Scrollbar positioning for mouse interaction
-	scrollbarX      int // X coordinate of scrollbar column in terminal
-	scrollbarY      int // Y coordinate of scrollbar start in terminal
-	scrollbarHeight int // Height of scrollbar in lines
+	scrollbarX      int
+	scrollbarY      int
+	scrollbarHeight int
 }
 
 // NewModel creates a new Bubble Tea model
-func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, phaseManager *phase.Manager, phaseController *phase.Controller, workDir string) Model {
+func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, workDir string) Model {
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize textarea for input
 	ta := textarea.New()
-	ta.Placeholder = "Type message or /plan, /execute, /verify (Enter to send, Shift+Enter for new line)..."
+	ta.Placeholder = "Type a message (Enter to send, Shift+Enter for new line)..."
 	ta.Focus()
 	ta.CharLimit = 0 // No limit
 	ta.SetWidth(80)  // Will be resized on first render
@@ -77,22 +73,19 @@ func NewModel(cfg *config.Config, aiClient *client.OpenAIClient, phaseManager *p
 	sp.Style = lipgloss.NewStyle().Foreground(colorGreen)
 
 	return Model{
-		client:          aiClient,
-		config:          cfg,
-		phaseManager:    phaseManager,
-		phaseController: phaseController,
-		ctx:             ctx,
-		cancel:          cancel,
-		textarea:        ta,
-		viewport:        vp,
-		spinner:         sp,
-		messages:        []client.Message{},
-		isProcessing:    false,
-		currentPhase:    phaseManager.GetInitialPhase(),
-		systemMessage:   "Welcome to EmmAI",
-		tokenCount:      0,
-		ready:           false,
-		workDir:         workDir,
+		client:        aiClient,
+		config:        cfg,
+		ctx:           ctx,
+		cancel:        cancel,
+		textarea:      ta,
+		viewport:      vp,
+		spinner:       sp,
+		messages:      []client.Message{},
+		isProcessing:  false,
+		systemMessage: "Welcome to EmmAI",
+		tokenCount:    0,
+		ready:         false,
+		workDir:       workDir,
 	}
 }
 

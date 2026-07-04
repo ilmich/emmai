@@ -11,20 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// PhaseConfig represents a single phase in the workflow
-type PhaseConfig struct {
-	Name         string   `yaml:"name"`
-	Prompt       string   `yaml:"prompt"`
-	NextPhase    string   `yaml:"next_phase,omitempty"`
-	ReadOnly     bool     `yaml:"read_only"`
-	AllowedTools []string `yaml:"allowed_tools"`
-}
-
-// GetAllowedTools returns the list of tools allowed in this phase
-func (p *PhaseConfig) GetAllowedTools() []string {
-	return p.AllowedTools
-}
-
 // SecurityPolicy holds security settings for tools
 type SecurityPolicy struct {
 	CommandExecution CommandExecutionPolicy `yaml:"command_execution"`
@@ -43,10 +29,9 @@ type CommandExecutionPolicy struct {
 
 // AllowedCommand defines a whitelisted command with restrictions
 type AllowedCommand struct {
-	Prefix        string   `yaml:"prefix"`
-	Subcommands   []string `yaml:"subcommands,omitempty"`
-	BlockedArgs   []string `yaml:"blocked_args,omitempty"`
-	AllowedPhases []string `yaml:"allowed_phases,omitempty"`
+	Prefix      string   `yaml:"prefix"`
+	Subcommands []string `yaml:"subcommands,omitempty"`
+	BlockedArgs []string `yaml:"blocked_args,omitempty"`
 }
 
 // ModelProfile holds per-model overrides selectable via --model flag
@@ -67,11 +52,9 @@ type Config struct {
 	Model              string                    `yaml:"model"`
 	Temperature        float32                   `yaml:"temperature"`
 	MaxTokens          int                       `yaml:"max_tokens"`
-	ContextSize        int                       `yaml:"context_size,omitempty"`
-	SystemPrompt       string                    `yaml:"system_prompt"`
-	Phases             []PhaseConfig             `yaml:"phases,omitempty"`
-	InitialPhase       string                    `yaml:"initial_phase,omitempty"`
-	Security           SecurityPolicy            `yaml:"security,omitempty"`
+	ContextSize  int            `yaml:"context_size,omitempty"`
+	SystemPrompt string         `yaml:"system_prompt"`
+	Security     SecurityPolicy `yaml:"security,omitempty"`
 	Models             map[string]ModelProfile   `yaml:"models,omitempty"`
 }
 
@@ -84,10 +67,8 @@ func Load() (*Config, error) {
 		Model:              DefaultModel,
 		Temperature:        DefaultTemperature,
 		MaxTokens:          DefaultMaxTokens,
-		SystemPrompt:       DefaultSystemPrompt,
-		Phases:             DefaultPhases,
-		InitialPhase:       DefaultInitialPhase,
-		Security:           DefaultSecurityPolicy(),
+		SystemPrompt: DefaultSystemPrompt,
+		Security:     DefaultSecurityPolicy(),
 	}
 
 	// Try to load from config file
