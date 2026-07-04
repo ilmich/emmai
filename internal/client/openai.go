@@ -316,26 +316,21 @@ func (c *OpenAIClient) processWithTools(ctx context.Context, textChan chan<- str
 func (c *OpenAIClient) buildAPIMessages() []openai.ChatCompletionMessage {
 	messages := make([]openai.ChatCompletionMessage, 0, len(c.conversation.Messages)+1)
 
-	// Add system prompt if configured and not already in history
+	// Always inject the current system prompt first; skip any stale system
+	// messages already baked into the conversation history.
 	systemPrompt := c.config.SystemPrompt
 	if systemPrompt != "" {
-		hasSystemMessage := false
-		for _, msg := range c.conversation.Messages {
-			if msg.Role == "system" {
-				hasSystemMessage = true
-				break
-			}
-		}
-		if !hasSystemMessage {
-			messages = append(messages, openai.ChatCompletionMessage{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: systemPrompt,
-			})
-		}
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: systemPrompt,
+		})
 	}
 
-	// Add conversation history
+	// Add conversation history, skipping stored system messages
 	for _, msg := range c.conversation.Messages {
+		if msg.Role == "system" {
+			continue
+		}
 		apiMsg := openai.ChatCompletionMessage{
 			Role:    msg.Role,
 			Content: msg.Content,

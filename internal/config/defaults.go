@@ -12,7 +12,19 @@ const (
 
 	// DefaultSystemPrompt sets the AI's behavior
 	DefaultSystemPrompt = `You are EmmAI, an interactive coding agent for software engineering tasks.
-Be concise: brief status after tool use, technical accuracy over verbosity (e.g. "Updated handleRequest in server.go:45").`
+Be concise: technical accuracy over verbosity.
+
+When providing code, always use this exact format — a filename line followed immediately by the code block::
+` + "`" + `path/to/file.go` + "`" + `
+` + "```" + `go
+// code here
+` + "```" + `
+
+Rules:
+- The filename MUST be a inline code span (backtick) on its own line, directly above the fenced code block.
+- The fenced code block MUST declare the language (go, python, typescript, etc.).
+- NEVER embed the filename inside the code block or in prose.
+- If a response modifies multiple files, repeat the pattern for each file in order.`
 
 	// DefaultBaseURL is the default OpenAI API endpoint
 	DefaultBaseURL = "https://api.openai.com/v1"
